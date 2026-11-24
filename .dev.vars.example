@@ -1,0 +1,11 @@
+# ==============================================================================
+# Cloudflare Workers Local Secrets (.dev.vars.example)
+# Copy to .dev.vars for local Wrangler/Miniflare Worker previews (never commit)
+# ==============================================================================
+
+SESSION_SECRET=dev_session_secret_at_least_32_characters_long_for_signing
+COOKIE_SECURE=false
+WHATSAPP_PROVIDER=MOCK
+WHATSAPP_API_KEY=mock_whatsapp_key
+WHATSAPP_PHONE_NUMBER_ID=mock_phone_id
+WHATSAPP_TEMPLATE_NAME=sms_auth_otp

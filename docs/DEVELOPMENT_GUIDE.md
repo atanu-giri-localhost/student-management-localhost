@@ -1,16 +1,16 @@
 # Development & Setup Guide
 
 **Project:** Student Management System (Coaching Institute + Mess Fee Management)  
-**Approved Stack:** Next.js App Router (JavaScript) · Cloudflare Workers · Cloudflare D1 (Direct `env.DB` Bindings & Native SQL Migrations)  
-**Document Version:** 2.0 (Phase 0 Aligned)  
+**Approved Stack:** Next.js App Router (JavaScript) · Cloudflare Workers (`vinext`) · Cloudflare D1 (Direct `env.DB` Bindings & Native SQL Migrations)  
+**Document Version:** 2.1 (Phase 1 Verified)  
 
 ---
 
 ## 1. Prerequisites
 
-* **Node.js:** `v20.x` or later (LTS)
-* **Package Manager:** `pnpm` (recommended, `v8.x+` or `v9.x+`)
-* **Cloudflare CLI:** `wrangler` (`v3.x+`)
+* **Node.js:** `v20.x` or later LTS (verified on `v24.14.1`)
+* **Package Manager:** `npm` (`v10.x+` / verified on `v11.11.0`)
+* **Cloudflare CLI:** `wrangler` (`v4.x`, installed as a devDependency and invoked via `npx wrangler`)
 * **Git:** `2.30+`
 
 ---
@@ -22,36 +22,37 @@
 git clone <repository_url> student-management
 cd student-management
 
-pnpm install
+npm install
 ```
 
-### Step 2: Configure Environment Variables
+### Step 2: Configure Environment Variables & Worker Secrets
 ```bash
 cp .env.example .env.local
+cp .dev.vars.example .dev.vars
 ```
-*(In development, `WHATSAPP_PROVIDER="MOCK"` is set by default, which outputs OTP codes directly to the terminal console).*
+*(In development, `WHATSAPP_PROVIDER="MOCK"` is set by default for local testing without external WhatsApp API calls).*
 
 ### Step 3: Initialize Local Cloudflare D1 Database & Run Migrations
 Wrangler emulates Cloudflare D1 locally in `.wrangler/state/v3/d1`:
 ```bash
 # Apply versioned SQL migrations (migrations/*.sql) to local D1 SQLite database
-pnpm exec wrangler d1 migrations apply sms-coaching-d1 --local
+npm run db:migrate:local
 
 # Verify applied migrations and foreign-key enforcement
-pnpm exec wrangler d1 migrations list sms-coaching-d1 --local
-pnpm exec wrangler d1 execute sms-coaching-d1 --local --command="PRAGMA foreign_keys = ON; SELECT name FROM sqlite_master WHERE type='table';"
+npx wrangler d1 migrations list sms-coaching-d1 --local
+npx wrangler d1 execute sms-coaching-d1 --local --command="PRAGMA foreign_keys = ON; SELECT name FROM sqlite_master WHERE type='table';"
 ```
 
-*(When adding schema changes later, scaffold a new file with `pnpm exec wrangler d1 migrations create sms-coaching-d1 <migration_name>` and author pure SQLite DDL in `migrations/`.)*
+*(When adding schema changes later, scaffold a new file with `npm run db:migration:create -- <migration_name>` and author pure SQLite DDL in `migrations/`.)*
 
 ### Step 4: Seed Initial Synthetic Demo Data
 ```bash
-pnpm exec wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql
+npm run db:seed:local
 ```
 
 ### Step 5: Start the Development Server
 ```bash
-pnpm dev
+npm run dev
 ```
 * **Application URL:** [http://localhost:3000](http://localhost:3000)
 
@@ -59,7 +60,7 @@ pnpm dev
 
 ## 3. Demo Credentials (Local Development Mode)
 
-When `WHATSAPP_PROVIDER="MOCK"` is enabled, any registered phone number can use OTP `123456` or check the console logs:
+When `WHATSAPP_PROVIDER="MOCK"` is enabled, seeded demo phone numbers (`seeds/seed.sql`) support local development testing:
 
 | Role | Normalized Phone Number | Initial Landing Portal |
 | :--- | :--- | :--- |
@@ -72,15 +73,15 @@ When `WHATSAPP_PROVIDER="MOCK"` is enabled, any registered phone number can use 
 
 ---
 
-## 4. Phase 0 Compatibility Spike Checklist
+## 4. Phase 0 / Phase 1 Compatibility Spike Checklist
 
-Before writing application features, the team must complete and sign off the Phase 0 compatibility spike:
+Before writing domain features (Phase 2+), verify these foundation checks:
 
-1. [ ] **Deployment Adapter Spike:** Validate **vinext** with Next.js App Router, Server Components, Route Handlers, and session cookies on Workers. (Evaluate OpenNext if any incompatibility arises).
-2. [ ] **Native D1 Migrations & Foreign Keys:** Confirm clean database initialization via `wrangler d1 migrations apply sms-coaching-d1 --local`, `PRAGMA foreign_keys = ON;`, and parameterized `env.DB.prepare(...).bind(...)` queries in standard JavaScript (`.js`).
-3. [ ] **Request-Scoped Binding Access:** Verify `env.DB` and `env.STORAGE` are accessed cleanly per request without global singleton leaks.
-4. [ ] **Atomic D1 Batch Workflow:** Test multi-statement financial write rollback using `env.DB.batch([...])`. Verify that if one statement fails (e.g., constraint violation), the entire transaction rolls back cleanly.
-5. [ ] **WhatsApp OTP Mock Adapter:** Confirm phone normalization, OTP hash storage, attempt limits (3 max), and 60-second resend throttling.
+1. [x] **Deployment Adapter Spike:** Validated `vinext` (`vinext@1.4.6` + `@cloudflare/vite-plugin`) with App Router pages, Tailwind CSS v4, and `/api/v1/health` Route Handler on Workers (`npm run build && npm run preview` passed; OpenNext fallback not required).
+2. [x] **Native D1 Migrations & Foreign Keys:** Verified clean database initialization via `npx wrangler d1 migrations apply sms-coaching-d1 --local` (`0001_initial_schema.sql`, 36 tables), `PRAGMA foreign_keys = ON;`, and parameterized `env.DB.prepare(...).bind(...)` queries in standard JavaScript (`.js`).
+3. [x] **Request-Scoped Binding Access:** Verified `resolveWorkerEnv()`, `getDb(env)`, and `getStorage(env)` in `src/lib/cloudflare/bindings.js` without global singleton leaks.
+4. [x] **Atomic D1 Batch Workflow:** Verified multi-statement financial write commit and full rollback via `env.DB.batch([...])` in `tests/integration/d1-batch.test.js`.
+5. [ ] **WhatsApp OTP Mock & Provider Adapter (Phase 2 Gate):** Confirm phone normalization, HMAC/SHA-256 OTP hash storage, attempt limits (3 max), 60-second resend cooldown, and 5/hour IP throttling once Phase 2 auth endpoints are built.
 
 ---
 
@@ -88,15 +89,15 @@ Before writing application features, the team must complete and sign off the Pha
 
 | Command | Action |
 | :--- | :--- |
-| `pnpm dev` | Starts local Next.js development server with local bindings. |
-| `pnpm build` | Compiles application via Cloudflare adapter (`vinext` / `open-next`). |
-| `pnpm preview` | Runs Cloudflare Workers local preview via Wrangler. |
-| `pnpm db:migration:create` | Runs `wrangler d1 migrations create sms-coaching-d1` to create a numbered SQL migration in `migrations/`. |
-| `pnpm db:migrate:local` | Applies pending `migrations/*.sql` files to local D1 via `wrangler d1 migrations apply --local`. |
-| `pnpm db:migrate:prod` | Applies reviewed pending migrations to production D1 via `wrangler d1 migrations apply --remote`. |
-| `pnpm db:seed:local` | Executes synthetic `seeds/seed.sql` against local D1 via `wrangler d1 execute --local`. |
-| `pnpm test` | Runs unit and integration test suite via Vitest. |
-| `pnpm lint` | Runs ESLint and accessibility lint checks. |
+| `npm run dev` | Starts local `vinext dev` server with local bindings. |
+| `npm run build` | Compiles application via `vinext build` into `dist/client` and `dist/server`. |
+| `npm run preview` | Runs Cloudflare Workers local preview via `vite preview` (`@cloudflare/vite-plugin`). |
+| `npm run db:migration:create -- <name>` | Runs `wrangler d1 migrations create sms-coaching-d1 <name>` to create a numbered SQL migration in `migrations/`. |
+| `npm run db:migrate:local` | Applies pending `migrations/*.sql` files to local D1 via `wrangler d1 migrations apply sms-coaching-d1 --local`. |
+| `npm run db:migrate:prod` | Applies reviewed pending migrations to production D1 via `wrangler d1 migrations apply sms-coaching-d1 --remote`. |
+| `npm run db:seed:local` | Executes synthetic `seeds/seed.sql` against local D1 via `wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql`. |
+| `npm test` | Runs unit and integration test suite via `vitest run`. |
+| `npm run lint` | Runs ESLint (`eslint .`) including React, Hooks, and JSX accessibility (`jsx-a11y`) checks. |
 
 ---
 

@@ -1,25 +1,27 @@
 # Configuration & Environment Specification
 
 **Project:** Student Management System (Coaching Institute + Mess Fee Management)  
-**Deployment Platform:** Cloudflare Workers · Cloudflare D1 · Cloudflare R2  
-**Document Version:** 2.0 (Phase 0 Aligned)  
+**Deployment Platform:** Cloudflare Workers (`vinext`) · Cloudflare D1 · Cloudflare R2  
+**Document Version:** 2.1 (Phase 1 Verified)  
 
 ---
 
-## 1. Cloudflare Workers Configuration (`wrangler.toml`)
+## 1. Cloudflare Workers & Build Configuration (`wrangler.toml`, `vite.config.js`)
 
-The root `wrangler.toml` defines edge worker bindings, D1 databases, R2 buckets, and compatibility flags:
+The root `wrangler.toml` defines edge worker entrypoints (`vinext`), static asset routing, D1 databases, R2 buckets, and compatibility flags:
 
 ```toml
 name = "student-management-system"
-main = ".open-next/worker.js" # or vinext entrypoint
-compatibility_date = "2024-09-23"
+main = "vinext/server/fetch-handler"
+compatibility_date = "2025-11-17"
 compatibility_flags = ["nodejs_compat"]
 
-# Static asset serving for Next.js build output
 [assets]
-directory = ".open-next/assets"
+directory = "dist/client"
 binding = "ASSETS"
+html_handling = "none"
+not_found_handling = "none"
+run_worker_first = ["/*", "!/_next/static/*", "!/*/_next/static/*"]
 
 # ==========================================
 # CLOUDFLARE D1 DATABASE (SQLite)
@@ -27,7 +29,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "sms-coaching-d1"
-database_id = "00000000-0000-0000-0000-000000000000" # Replace with production ID
+database_id = "00000000-0000-0000-0000-000000000000" # Replace with remote D1 ID
 migrations_dir = "migrations" # Native Wrangler D1 SQL migrations tracked in d1_migrations
 
 # ==========================================
@@ -38,31 +40,37 @@ binding = "STORAGE"
 bucket_name = "sms-coaching-uploads"
 
 # ==========================================
-# ENVIRONMENT VARIABLES & SECRETS
+# RUNTIME VARIABLES
 # ==========================================
 [vars]
-ENVIRONMENT = "production"
+ENVIRONMENT = "development" # Set "production" for production deploy
 APP_NAME = "Apex Coaching Institute SMS"
 DEFAULT_ACADEMIC_SESSION = "2026-2027"
 DEFAULT_DUE_DAY_OF_MONTH = 10
-WHATSAPP_PROVIDER = "META" # META, TWILIO, or MOCK
+WHATSAPP_PROVIDER = "MOCK" # META, TWILIO, or MOCK
 
-# Non-committed production secrets managed via `wrangler secret put`:
+# Non-committed production secrets managed via `npx wrangler secret put`:
 # - SESSION_SECRET
 # - WHATSAPP_API_KEY
 # - WHATSAPP_PHONE_NUMBER_ID
 # - WHATSAPP_TEMPLATE_NAME
 ```
 
+### Supporting Root Tooling Configuration
+* **`vite.config.js`:** Configures `vinext()` alongside `@cloudflare/vite-plugin` (`cloudflare({ viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] } })`) and maps `@` -> `./src`.
+* **`next.config.mjs`:** Sets `images: { unoptimized: true }` for Workers execution.
+* **`postcss.config.mjs` & `src/app/globals.css`:** Configures Tailwind CSS v4 (`@tailwindcss/postcss` and `@import "tailwindcss";`).
+* **`jsconfig.json`:** Enforces JavaScript-only (`checkJs: false`) across `src/**/*.js`, `src/**/*.jsx`, and `tests/**/*.js` with `@/*` -> `./src/*`.
+
 ---
 
-## 2. Local Environment Variables (`.env.local` / `.env.example`)
+## 2. Local Environment Variables (`.env.local` & `.dev.vars`)
 
-Create `.env.local` for local development:
+Copy `.env.example` to `.env.local` and `.dev.vars.example` to `.dev.vars` (for local Wrangler/Miniflare Worker previews; never commit either file):
 
 ```bash
 # ==========================================
-# APPLICATION & RUNTIME
+# APPLICATION & RUNTIME (.env.local)
 # ==========================================
 NODE_ENV=development
 APP_NAME="Apex Student Management System"
@@ -72,7 +80,7 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 # ==========================================
 # SESSION & SECURITY
 # ==========================================
-# Generate with: openssl rand -base64 32
+# Generate production secret with: openssl rand -base64 32
 SESSION_SECRET="dev_session_secret_at_least_32_characters_long_for_signing"
 COOKIE_SECURE=false # Set true in production (HTTPS)
 COOKIE_NAME="sms_session"
@@ -80,7 +88,7 @@ COOKIE_NAME="sms_session"
 # ==========================================
 # WHATSAPP OTP CONFIGURATION
 # ==========================================
-WHATSAPP_PROVIDER="MOCK" # In local dev: "MOCK" logs OTP to console
+WHATSAPP_PROVIDER="MOCK" # In local dev: "MOCK" logs OTP to server console
 WHATSAPP_API_KEY="mock_whatsapp_key"
 WHATSAPP_PHONE_NUMBER_ID="mock_phone_id"
 WHATSAPP_TEMPLATE_NAME="sms_auth_otp"
@@ -95,6 +103,18 @@ OTP_RESEND_COOLDOWN_SECONDS=60
 D1_DATABASE_NAME="sms-coaching-d1"
 ```
 
+```bash
+# ==========================================
+# WORKER PREVIEW SECRETS (.dev.vars)
+# ==========================================
+SESSION_SECRET=dev_session_secret_at_least_32_characters_long_for_signing
+COOKIE_SECURE=false
+WHATSAPP_PROVIDER=MOCK
+WHATSAPP_API_KEY=mock_whatsapp_key
+WHATSAPP_PHONE_NUMBER_ID=mock_phone_id
+WHATSAPP_TEMPLATE_NAME=sms_auth_otp
+```
+
 ---
 
 ## 3. Native D1 Migrations & Wrangler Workflow (`migrations/*.sql`)
@@ -103,24 +123,26 @@ This project uses **no ORM or external schema-generation tool**. Database schema
 
 ```bash
 # 1. Create a new numbered SQL migration file in migrations/
-pnpm exec wrangler d1 migrations create sms-coaching-d1 initial_schema
-# Creates: migrations/0001_initial_schema.sql
+npm run db:migration:create -- add_feature_table
+# Or directly: npx wrangler d1 migrations create sms-coaching-d1 add_feature_table
 
 # 2. Apply pending migrations to local D1 (.wrangler/state/v3/d1)
-pnpm exec wrangler d1 migrations apply sms-coaching-d1 --local
+npm run db:migrate:local
+# Or: npx wrangler d1 migrations apply sms-coaching-d1 --local
 
 # 3. Apply pending migrations to remote production D1
-pnpm exec wrangler d1 migrations apply sms-coaching-d1 --remote
+npm run db:migrate:prod
+# Or: npx wrangler d1 migrations apply sms-coaching-d1 --remote
 
 # 4. Inspect applied vs pending migrations
-pnpm exec wrangler d1 migrations list sms-coaching-d1 --local
-pnpm exec wrangler d1 migrations list sms-coaching-d1 --remote
+npx wrangler d1 migrations list sms-coaching-d1 --local
+npx wrangler d1 migrations list sms-coaching-d1 --remote
 ```
 
 **Migration & Seed Rules:**
-1. Include `PRAGMA foreign_keys = ON;` and explicit `REFERENCES ... ON DELETE RESTRICT/CASCADE`, `UNIQUE`, and `CHECK` constraints directly in `migrations/*.sql`.
+1. Include `PRAGMA foreign_keys = ON;` and explicit `REFERENCES ... ON DELETE RESTRICT/CASCADE`, `UNIQUE`, and `CHECK` constraints directly in `migrations/*.sql`. Never put `BEGIN`/`COMMIT` inside migration or seed files.
 2. Keep applied migrations immutable; fix mistakes with follow-up numbered migrations (`0002_*.sql`).
-3. Keep synthetic development fixtures in `seeds/seed.sql` outside `migrations/` and apply locally via `wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql` so `wrangler d1 migrations apply --remote` never runs seed data in production.
+3. Keep synthetic development fixtures in `seeds/seed.sql` outside `migrations/` and apply locally via `npm run db:seed:local` (`npx wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql`) so `npm run db:migrate:prod` never runs seed data in production.
 
 ---
 

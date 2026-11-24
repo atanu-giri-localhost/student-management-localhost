@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022"
+  },
+  "include": ["src/**/*.js", "src/**/*.jsx", "tests/**/*.js"],
+  "exclude": ["node_modules", "dist", ".wrangler", ".vinext", ".next", ".open-next"]
+}

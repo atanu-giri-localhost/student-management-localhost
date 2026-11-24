@@ -47,6 +47,7 @@ dist/
 build/
 .turbo/
 *.tsbuildinfo
+next-env.d.ts
 
 # --- Local Uploads, Backups & Real Student Data (NEVER commit PII) ---
 uploads/

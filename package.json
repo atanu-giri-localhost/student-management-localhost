@@ -1,0 +1,40 @@
+{
+  "name": "student-management-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vinext dev",
+    "build": "vinext build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "db:migration:create": "wrangler d1 migrations create sms-coaching-d1",
+    "db:migrate:local": "wrangler d1 migrations apply sms-coaching-d1 --local",
+    "db:migrate:prod": "wrangler d1 migrations apply sms-coaching-d1 --remote",
+    "db:seed:local": "wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-server-dom-webpack": "^19.3.1",
+    "vinext": "^1.4.6",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.70.1",
+    "@eslint/js": "^9.39.0",
+    "@tailwindcss/postcss": "^4.3.5",
+    "@vitejs/plugin-react": "^6.3.0",
+    "@vitejs/plugin-rsc": "^0.5.39",
+    "eslint": "^9.39.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "tailwindcss": "^4.3.5",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1",
+    "wrangler": "^4.168.0"
+  }
+}

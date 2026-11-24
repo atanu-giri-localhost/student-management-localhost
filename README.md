@@ -27,29 +27,33 @@ The application delivers tailored, role-specific portals with strict, server-sid
 
 * **Framework:** Next.js App Router (Full-Stack Modular Monolith).
 * **Language:** **JavaScript / JSX (`.js`, `.jsx`)** across application code (Zod for runtime validation, JSDoc for typing).
-* **Edge Runtime:** Cloudflare Workers (deployed via **vinext** adapter; OpenNext fallback evaluated).
+* **Edge Runtime:** Cloudflare Workers (deployed via **vinext** baseline; OpenNext documented fallback).
 * **Database:** **Cloudflare D1 (SQLite)** accessed directly via request-scoped Workers bindings (`env.DB.prepare().bind()` and atomic `env.DB.batch([...])` — **no ORM**).
 * **Migrations:** **Native Wrangler D1 SQL migrations** (`migrations/*.sql`, tracked in `d1_migrations`).
 * **File Storage:** **Cloudflare R2** for student/staff photographs and documents.
 * **Financial Storage:** **Integer Paise (`amount_paise INTEGER`)** for all INR monetary calculations.
 * **Authentication:** **WhatsApp OTP** with provider abstraction, hashed OTP verification, and secure `HttpOnly` session cookies.
-* **Styling & Components:** Tailwind CSS + shadcn/ui (Radix UI primitives).
+* **Styling & Components:** Tailwind CSS v4 + shadcn/ui (Radix UI primitives).
 
 ---
 
 ## 📚 Technical Documentation Suite
 
-All architectural blueprints, database schemas, and guides in `docs/` are aligned with the Phase 0 Architecture Pack:
+All architectural blueprints, database schemas, and guides in `docs/` are aligned with the Phase 0 Architecture Pack and verified Phase 1 `vinext` + D1 scaffolding:
 
 | Document | Purpose & Summary | Direct Link |
 | :--- | :--- | :--- |
+| **Development Roadmap** | Ultimate Phase 0 through Phase 10 execution plan: file paths, `npm`/`wrangler` commands, OPEN gates, and exit criteria. | [docs/DEVELOPMENT_ROADMAP.md](./docs/DEVELOPMENT_ROADMAP.md) |
 | **System Architecture** | Modular Monolith layout, Cloudflare Workers execution model, request-scoped D1 bindings, R2 storage, and security layers. | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 | **Database Schema** | Cloudflare D1 (SQLite) relational schema, ER diagram, integer paise rules, session-based enrollments, and SQLite DDL / D1 patterns. | [docs/DATABASE_SCHEMA.md](./docs/DATABASE_SCHEMA.md) |
+| **SQL DDL Blueprint** | Physical 36-table SQLite DDL reference, 50 explicit indexes, `EXPLAIN QUERY PLAN` patterns, and synthetic seed reference. | [docs/SQL_DDL_BLUEPRINT.md](./docs/SQL_DDL_BLUEPRINT.md) |
+| **Security & RBAC Spec** | Request pipeline, CSRF/Origin checks, Web Crypto WhatsApp OTP state machine, exact SQL isolation predicates, R2 & `audit_logs`. | [docs/SECURITY_AND_RBAC_SPEC.md](./docs/SECURITY_AND_RBAC_SPEC.md) |
 | **RESTful API Spec** | Next.js App Router Route Handlers (`/api/v1/*`), WhatsApp OTP lifecycle, integer paise payloads, and response envelopes. | [docs/API_SPECIFICATION.md](./docs/API_SPECIFICATION.md) |
 | **Business Rules & Logic** | Domain logic: fee invoicing, payment allocations, dual attendance registers, teacher scoping, and list of 15 OPEN decisions. | [docs/BUSINESS_RULES_AND_LOGIC.md](./docs/BUSINESS_RULES_AND_LOGIC.md) |
+| **Open Decisions Register** | Stakeholder sign-off matrix for all 15 canonical `OPEN` decisions mapped to blocking phases, tables, routes, and proposed pilot defaults. | [docs/OPEN_DECISIONS.md](./docs/OPEN_DECISIONS.md) |
 | **Frontend & UI Spec** | WhatsApp OTP screens, role-based navigation, Parent Child Switcher, Rapid Attendance Sheet, and INR currency formatting. | [docs/FRONTEND_AND_UI_SPEC.md](./docs/FRONTEND_AND_UI_SPEC.md) |
-| **Configuration & Env** | Cloudflare `wrangler.toml` configuration, D1 & R2 bindings, `.env.local` template, and session cookie policies. | [docs/CONFIGURATION_AND_ENV.md](./docs/CONFIGURATION_AND_ENV.md) |
-| **Development Guide** | Local development with Wrangler D1 emulation, compatibility spike checklist, native D1 SQL migrations, and test strategy. | [docs/DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md) |
+| **Configuration & Env** | Cloudflare `wrangler.toml` (`vinext`), `vite.config.js`, D1 & R2 bindings, `.env.local` / `.dev.vars`, and session cookie policies. | [docs/CONFIGURATION_AND_ENV.md](./docs/CONFIGURATION_AND_ENV.md) |
+| **Development Guide** | Local development with `npm`, Wrangler D1 emulation, Phase 0 compatibility spike checklist, native D1 SQL migrations, and tests. | [docs/DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md) |
 | **Phase 0 Baseline Pack** | Approved Phase 0 Architecture Pack and sign-off checklist. | [Phase 0 Pack](./Student_Management_System_Phase_0_Architecture_Pack/phase0/) |
 
 ---
@@ -61,23 +65,25 @@ All architectural blueprints, database schemas, and guides in `docs/` are aligne
 git clone <repository_url> student-management
 cd student-management
 
-# 2. Install dependencies
-pnpm install
+# 2. Install dependencies (Node.js v20+ LTS / npm)
+npm install
 
-# 3. Configure local environment variables
+# 3. Configure local environment variables and Wrangler Worker secrets
 cp .env.example .env.local
+cp .dev.vars.example .dev.vars
 
 # 4. Apply native SQL migrations (migrations/*.sql) to local Cloudflare D1
-pnpm exec wrangler d1 migrations apply sms-coaching-d1 --local
+npm run db:migrate:local
 
-# 5. Seed synthetic development data
-pnpm exec wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql
+# 5. Seed synthetic development data (never run against production)
+npm run db:seed:local
 
-# 6. Start the development server
-pnpm dev
+# 6. Start the vinext development server
+npm run dev
 ```
 
 * **Application URL:** `http://localhost:3000`
+* **Verification & Worker Build:** `npm run lint && npm test && npm run build` (`npm run preview` runs the compiled Cloudflare Worker locally).
 
 ---
 

@@ -1,0 +1,37 @@
+name = "student-management-system"
+main = "vinext/server/fetch-handler"
+compatibility_date = "2025-11-17"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "dist/client"
+binding = "ASSETS"
+html_handling = "none"
+not_found_handling = "none"
+run_worker_first = ["/*", "!/_next/static/*", "!/*/_next/static/*"]
+
+# ==========================================
+# CLOUDFLARE D1 DATABASE (SQLite)
+# ==========================================
+[[d1_databases]]
+binding = "DB"
+database_name = "sms-coaching-d1"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# ==========================================
+# CLOUDFLARE R2 OBJECT STORAGE
+# ==========================================
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "sms-coaching-uploads"
+
+# ==========================================
+# RUNTIME VARIABLES
+# ==========================================
+[vars]
+ENVIRONMENT = "development"
+APP_NAME = "Apex Coaching Institute SMS"
+DEFAULT_ACADEMIC_SESSION = "2026-2027"
+DEFAULT_DUE_DAY_OF_MONTH = 10
+WHATSAPP_PROVIDER = "MOCK"

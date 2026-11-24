@@ -22,13 +22,17 @@ Do not introduce Drizzle, Prisma, TypeORM, Kysely, or any ORM, and do not introd
 
 Read the relevant specification documents before planning or modifying code:
 
+- `@docs/DEVELOPMENT_ROADMAP.md` — Phase 0 through Phase 10 step-by-step execution blueprint, file targets, `npm`/`wrangler` commands, and exit gates.
 - `@docs/ARCHITECTURE.md` — Modular monolith structure (`src/app`, `src/modules`, `src/lib`), Workers request-scoped `env.DB`/`env.STORAGE` bindings, D1 concurrency, and security layers.
-- `@docs/DATABASE_SCHEMA.md` — D1 (SQLite) SQL DDL schema, UUID v4 keys, integer paise (`amount_paise`), session-scoped `enrollments`, dual attendance registers, and `file_objects`.
+- `@docs/DATABASE_SCHEMA.md` — D1 (SQLite) logical schema, UUID v4 keys, integer paise (`amount_paise`), session-scoped `enrollments`, dual attendance registers, and `file_objects`.
+- `@docs/SQL_DDL_BLUEPRINT.md` — Physical 36-table SQLite DDL reference (`migrations/0001_initial_schema.sql`), 50 explicit indexes, `EXPLAIN QUERY PLAN` hot paths, and `seeds/seed.sql` reference.
+- `@docs/SECURITY_AND_RBAC_SPEC.md` — Server-side request pipeline, Origin/CSRF checks, Web Crypto WhatsApp OTP state machine, exact SQL isolation predicates (`parent_students`, `teacher_assignments`, student fee wall), R2 access control, and `audit_logs`.
 - `@docs/API_SPECIFICATION.md` — Next.js App Router Route Handlers (`/api/v1/*`), JSON response/error envelopes (`data`, `pagination`, `meta.requestId`, `error`), Zod boundaries, and CSRF/origin checks.
 - `@docs/BUSINESS_RULES_AND_LOGIC.md` — RBAC permissions matrix, WhatsApp OTP lifecycle, teacher assignment scoping, dual attendance rules, integer paise finance formulas, parent-student linking, and the 15 explicitly unresolved **OPEN** decisions.
-- `@docs/CONFIGURATION_AND_ENV.md` — `wrangler.toml` (`DB` with `migrations_dir = "migrations"`, `STORAGE`, `ASSETS`), `.env.local`, cookie directives, rate limits, and R2 upload constraints.
-- `@docs/DEVELOPMENT_GUIDE.md` — Local Wrangler D1 setup, `wrangler d1 migrations` & synthetic seeding, Phase 0 compatibility spike checklist, and scripts.
-- `@docs/FRONTEND_AND_UI_SPEC.md` — Tailwind + shadcn/ui tokens, `formatINR(amountPaise)`, OTP login flow, role portals, Parent Child Switcher, and Rapid Attendance Sheet.
+- `@docs/OPEN_DECISIONS.md` — Stakeholder sign-off register mapping all 15 canonical `OPEN` decisions (`OD-01`..`OD-15`) to blocking phases, D1 tables, API routes, and unapproved proposed pilot defaults.
+- `@docs/CONFIGURATION_AND_ENV.md` — `wrangler.toml` (`vinext/server/fetch-handler`, `DB` with `migrations_dir = "migrations"`, `STORAGE`, `ASSETS`), `vite.config.js`, `.env.local` / `.dev.vars`, cookie directives, rate limits, and R2 upload constraints.
+- `@docs/DEVELOPMENT_GUIDE.md` — Local `npm` and Wrangler D1 setup, `npx wrangler d1 migrations` & synthetic seeding, verified Phase 1 `vinext` spike checklist, and `npm` scripts.
+- `@docs/FRONTEND_AND_UI_SPEC.md` — Tailwind CSS v4 + shadcn/ui tokens, `formatINR(amountPaise)`, OTP login flow, role portals, Parent Child Switcher, and Rapid Attendance Sheet.
 - `Student_Management_System_Phase_0_Architecture_Pack/phase0/PHASE_0_SIGNOFF_CHECKLIST.md` & `Student_Management_System_Phase_0_Architecture_Pack/phase0/docs/PRD_v1.2.md` — Phase 0 sign-off gates and baseline PRD (note: historical Phase 0 references to an ORM are superseded by the direct Workers `env.DB` + Wrangler SQL migrations rule above).
 
 Use project and platform skills when working on implementation or verification:
