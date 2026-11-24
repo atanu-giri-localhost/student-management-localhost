@@ -5,7 +5,7 @@
 [![Architecture](https://img.shields.io/badge/Architecture-Modular_Monolith-emerald.svg)](./docs/ARCHITECTURE.md)
 [![Runtime](https://img.shields.io/badge/Runtime-Cloudflare_Workers-orange.svg)](./docs/ARCHITECTURE.md)
 [![Database](https://img.shields.io/badge/Database-Cloudflare_D1_(SQLite)-indigo.svg)](./docs/DATABASE_SCHEMA.md)
-[![ORM](https://img.shields.io/badge/ORM-Drizzle_ORM_(JavaScript)-yellow.svg)](./docs/DATABASE_SCHEMA.md)
+[![Migrations](https://img.shields.io/badge/Migrations-Wrangler_D1_SQL-yellow.svg)](./docs/CONFIGURATION_AND_ENV.md)
 [![Storage](https://img.shields.io/badge/Storage-Cloudflare_R2-blue.svg)](./docs/CONFIGURATION_AND_ENV.md)
 
 ---
@@ -28,8 +28,8 @@ The application delivers tailored, role-specific portals with strict, server-sid
 * **Framework:** Next.js App Router (Full-Stack Modular Monolith).
 * **Language:** **JavaScript / JSX (`.js`, `.jsx`)** across application code (Zod for runtime validation, JSDoc for typing).
 * **Edge Runtime:** Cloudflare Workers (deployed via **vinext** adapter; OpenNext fallback evaluated).
-* **Database:** **Cloudflare D1 (SQLite)** accessed via request-scoped bindings.
-* **ORM:** **Drizzle ORM & Drizzle Kit** with committed, reviewed SQL migrations.
+* **Database:** **Cloudflare D1 (SQLite)** accessed directly via request-scoped Workers bindings (`env.DB.prepare().bind()` and atomic `env.DB.batch([...])` — **no ORM**).
+* **Migrations:** **Native Wrangler D1 SQL migrations** (`migrations/*.sql`, tracked in `d1_migrations`).
 * **File Storage:** **Cloudflare R2** for student/staff photographs and documents.
 * **Financial Storage:** **Integer Paise (`amount_paise INTEGER`)** for all INR monetary calculations.
 * **Authentication:** **WhatsApp OTP** with provider abstraction, hashed OTP verification, and secure `HttpOnly` session cookies.
@@ -44,12 +44,12 @@ All architectural blueprints, database schemas, and guides in `docs/` are aligne
 | Document | Purpose & Summary | Direct Link |
 | :--- | :--- | :--- |
 | **System Architecture** | Modular Monolith layout, Cloudflare Workers execution model, request-scoped D1 bindings, R2 storage, and security layers. | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
-| **Database Schema** | Cloudflare D1 (SQLite) relational schema, ER diagram, integer paise rules, session-based enrollments, and Drizzle definitions. | [docs/DATABASE_SCHEMA.md](./docs/DATABASE_SCHEMA.md) |
+| **Database Schema** | Cloudflare D1 (SQLite) relational schema, ER diagram, integer paise rules, session-based enrollments, and SQLite DDL / D1 patterns. | [docs/DATABASE_SCHEMA.md](./docs/DATABASE_SCHEMA.md) |
 | **RESTful API Spec** | Next.js App Router Route Handlers (`/api/v1/*`), WhatsApp OTP lifecycle, integer paise payloads, and response envelopes. | [docs/API_SPECIFICATION.md](./docs/API_SPECIFICATION.md) |
 | **Business Rules & Logic** | Domain logic: fee invoicing, payment allocations, dual attendance registers, teacher scoping, and list of 15 OPEN decisions. | [docs/BUSINESS_RULES_AND_LOGIC.md](./docs/BUSINESS_RULES_AND_LOGIC.md) |
 | **Frontend & UI Spec** | WhatsApp OTP screens, role-based navigation, Parent Child Switcher, Rapid Attendance Sheet, and INR currency formatting. | [docs/FRONTEND_AND_UI_SPEC.md](./docs/FRONTEND_AND_UI_SPEC.md) |
 | **Configuration & Env** | Cloudflare `wrangler.toml` configuration, D1 & R2 bindings, `.env.local` template, and session cookie policies. | [docs/CONFIGURATION_AND_ENV.md](./docs/CONFIGURATION_AND_ENV.md) |
-| **Development Guide** | Local development with Wrangler D1 emulation, compatibility spike checklist, Drizzle migrations, and test strategy. | [docs/DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md) |
+| **Development Guide** | Local development with Wrangler D1 emulation, compatibility spike checklist, native D1 SQL migrations, and test strategy. | [docs/DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md) |
 | **Phase 0 Baseline Pack** | Approved Phase 0 Architecture Pack and sign-off checklist. | [Phase 0 Pack](./Student_Management_System_Phase_0_Architecture_Pack/phase0/) |
 
 ---
@@ -67,12 +67,11 @@ pnpm install
 # 3. Configure local environment variables
 cp .env.example .env.local
 
-# 4. Generate & apply Drizzle migrations to local Cloudflare D1
-pnpm exec drizzle-kit generate
-pnpm exec wrangler d1 execute sms-coaching-d1 --local --file=./drizzle/migrations/0000_initial_schema.sql
+# 4. Apply native SQL migrations (migrations/*.sql) to local Cloudflare D1
+pnpm exec wrangler d1 migrations apply sms-coaching-d1 --local
 
 # 5. Seed synthetic development data
-pnpm exec wrangler d1 execute sms-coaching-d1 --local --file=./drizzle/seed.sql
+pnpm exec wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql
 
 # 6. Start the development server
 pnpm dev

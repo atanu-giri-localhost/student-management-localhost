@@ -28,7 +28,7 @@ binding = "ASSETS"
 binding = "DB"
 database_name = "sms-coaching-d1"
 database_id = "00000000-0000-0000-0000-000000000000" # Replace with production ID
-migrations_dir = "drizzle/migrations"
+migrations_dir = "migrations" # Native Wrangler D1 SQL migrations tracked in d1_migrations
 
 # ==========================================
 # CLOUDFLARE R2 OBJECT STORAGE
@@ -97,24 +97,30 @@ D1_DATABASE_NAME="sms-coaching-d1"
 
 ---
 
-## 3. Drizzle Kit Configuration (`drizzle.config.js`)
+## 3. Native D1 Migrations & Wrangler Workflow (`migrations/*.sql`)
 
-In accordance with ADR-003, Drizzle configuration is standard JavaScript:
+This project uses **no ORM or external schema-generation tool**. Database schema changes are authored directly as reviewed SQLite DDL files in `migrations/` (matching `migrations_dir = "migrations"` in `wrangler.toml`) and managed with Wrangler's built-in migration tracker (`d1_migrations`):
 
-```javascript
-/** @type {import('drizzle-kit').Config} */
-export default {
-  schema: './drizzle/schema/index.js',
-  out: './drizzle/migrations',
-  dialect: 'sqlite',
-  driver: 'd1-http',
-  dbCredentials: {
-    accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-    databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID,
-    token: process.env.CLOUDFLARE_API_TOKEN,
-  },
-};
+```bash
+# 1. Create a new numbered SQL migration file in migrations/
+pnpm exec wrangler d1 migrations create sms-coaching-d1 initial_schema
+# Creates: migrations/0001_initial_schema.sql
+
+# 2. Apply pending migrations to local D1 (.wrangler/state/v3/d1)
+pnpm exec wrangler d1 migrations apply sms-coaching-d1 --local
+
+# 3. Apply pending migrations to remote production D1
+pnpm exec wrangler d1 migrations apply sms-coaching-d1 --remote
+
+# 4. Inspect applied vs pending migrations
+pnpm exec wrangler d1 migrations list sms-coaching-d1 --local
+pnpm exec wrangler d1 migrations list sms-coaching-d1 --remote
 ```
+
+**Migration & Seed Rules:**
+1. Include `PRAGMA foreign_keys = ON;` and explicit `REFERENCES ... ON DELETE RESTRICT/CASCADE`, `UNIQUE`, and `CHECK` constraints directly in `migrations/*.sql`.
+2. Keep applied migrations immutable; fix mistakes with follow-up numbered migrations (`0002_*.sql`).
+3. Keep synthetic development fixtures in `seeds/seed.sql` outside `migrations/` and apply locally via `wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql` so `wrangler d1 migrations apply --remote` never runs seed data in production.
 
 ---
 

@@ -2,7 +2,8 @@
 
 **Project:** Student Management System (Coaching Institute + Mess Fee Management)  
 **Database Engine:** Cloudflare D1 (SQLite)  
-**ORM:** Drizzle ORM (JavaScript)  
+**Data Access:** Direct Workers `env.DB` Bindings (`prepare().bind()`, `batch()`) — No ORM  
+**Migrations:** Native Wrangler D1 SQL Migrations (`migrations/*.sql`)  
 **Document Version:** 2.0 (Phase 0 Aligned)  
 
 ---
@@ -14,9 +15,9 @@
 3. **Monetary Values:** **Integer Paise** (`INTEGER NOT NULL`). ₹1,500.00 is stored as `150000`. Floating-point values for money are strictly forbidden.
 4. **Timestamps:** UTC ISO-8601 strings (`TEXT`) or Unix epoch milliseconds. Recommended: ISO-8601 strings (e.g., `2026-11-23T18:15:00.000Z`).
 5. **Dates:** ISO-8601 calendar date strings `YYYY-MM-DD` (e.g., `2026-11-23`).
-6. **Booleans:** SQLite integer booleans (`0` for false, `1` for true).
-7. **Referential Integrity:** Foreign keys are explicitly defined and enabled in D1 configuration. No cascading deletions on historical academic or financial ledger records.
-8. **Historical Immutability:** Student enrollment records, invoice snapshots, payment allocations, exam marks, and attendance registers preserve history across academic sessions.
+6. **Booleans:** SQLite integer booleans (`0` for false, `1` for true). Always pass `1` or `0` (not JS booleans) when binding parameters via `env.DB.prepare(...).bind(...)`.
+7. **Referential Integrity:** Foreign keys are explicitly defined in SQLite DDL and enforced via `PRAGMA foreign_keys = ON;`. No cascading deletions on historical academic or financial ledger records (`ON DELETE RESTRICT`).
+8. **Historical Immutability & D1 Limits:** Student enrollment records, invoice snapshots, payment allocations, exam marks, and attendance registers preserve history across academic sessions. Keep D1 rows well under the 1 MB row limit by storing binary assets in R2 (`file_objects` holds metadata only).
 
 ---
 
@@ -444,42 +445,132 @@ Metadata for binary assets stored in Cloudflare R2.
 
 ---
 
-## 4. Drizzle ORM Schema Snippet (`drizzle/schema/finance.js`)
+## 4. Pure SQLite DDL & Direct D1 Repository Patterns
+
+All database tables, constraints, and indexes are authored as pure SQLite DDL in `migrations/*.sql` (applied via Wrangler D1 migrations), while runtime input/output contracts are validated with Zod in `src/modules/*/*.schemas.js`.
+
+### 4.1 SQLite DDL Excerpt (`migrations/0001_initial_schema.sql` — Finance Ledger)
+
+```sql
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id TEXT PRIMARY KEY,
+  invoice_number TEXT NOT NULL UNIQUE,
+  student_id TEXT NOT NULL REFERENCES students(id) ON DELETE RESTRICT,
+  enrollment_id TEXT NOT NULL REFERENCES enrollments(id) ON DELETE RESTRICT,
+  billing_month INTEGER NOT NULL CHECK (billing_month BETWEEN 1 AND 12),
+  billing_year INTEGER NOT NULL,
+  invoice_type TEXT NOT NULL CHECK (invoice_type IN ('COMBINED', 'SEPARATE_COACHING', 'SEPARATE_MESS')),
+  total_amount_paise INTEGER NOT NULL CHECK (total_amount_paise >= 0),
+  due_date TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'UNPAID' CHECK (status IN ('PAID', 'PARTIALLY_PAID', 'UNPAID')),
+  created_at TEXT NOT NULL,
+  UNIQUE (student_id, billing_month, billing_year, invoice_type)
+);
+
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id TEXT PRIMARY KEY,
+  invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  fee_component_id TEXT NOT NULL REFERENCES fee_components(id) ON DELETE RESTRICT,
+  description TEXT NOT NULL,
+  amount_paise INTEGER NOT NULL CHECK (amount_paise >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL REFERENCES students(id) ON DELETE RESTRICT,
+  amount_paid_paise INTEGER NOT NULL CHECK (amount_paid_paise > 0),
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('CASH', 'UPI', 'BANK_TRANSFER')),
+  transaction_reference TEXT,
+  payment_date TEXT NOT NULL,
+  notes TEXT,
+  recorded_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS payment_allocations (
+  id TEXT PRIMARY KEY,
+  payment_id TEXT NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE RESTRICT,
+  allocated_amount_paise INTEGER NOT NULL CHECK (allocated_amount_paise > 0),
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS receipts (
+  id TEXT PRIMARY KEY,
+  receipt_number TEXT NOT NULL UNIQUE,
+  payment_id TEXT NOT NULL UNIQUE REFERENCES payments(id) ON DELETE RESTRICT,
+  issued_date TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoices_student_status ON invoices(student_id, status);
+CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date) WHERE status != 'PAID';
+CREATE INDEX IF NOT EXISTS idx_payments_student_date ON payments(student_id, payment_date);
+CREATE INDEX IF NOT EXISTS idx_payment_allocations_invoice ON payment_allocations(invoice_id);
+```
+
+### 4.2 Direct D1 Repository + Zod Validation Example
 
 ```javascript
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+// src/modules/finance/finance.schemas.js
+import { z } from 'zod';
 
-export const invoices = sqliteTable('invoices', {
-  id: text('id').primaryKey(),
-  invoiceNumber: text('invoice_number').notNull().unique(),
-  studentId: text('student_id').notNull(),
-  enrollmentId: text('enrollment_id').notNull(),
-  billingMonth: integer('billing_month').notNull(),
-  billingYear: integer('billing_year').notNull(),
-  invoiceType: text('invoice_type').notNull(), // COMBINED, SEPARATE_COACHING, SEPARATE_MESS
-  totalAmountPaise: integer('total_amount_paise').notNull(),
-  dueDate: text('due_date').notNull(),
-  status: text('status').notNull().default('UNPAID'), // PAID, PARTIALLY_PAID, UNPAID
-  createdAt: text('created_at').notNull(),
+export const recordPaymentSchema = z.object({
+  studentId: z.string().uuid(),
+  amountPaidPaise: z.number().int().positive(),
+  paymentMethod: z.enum(['CASH', 'UPI', 'BANK_TRANSFER']),
+  transactionReference: z.string().trim().min(1).optional(),
+  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  notes: z.string().trim().max(500).optional(),
+  allocations: z.array(z.object({
+    invoiceId: z.string().uuid(),
+    allocatedAmountPaise: z.number().int().positive(),
+  })).min(1),
 });
+```
 
-export const payments = sqliteTable('payments', {
-  id: text('id').primaryKey(),
-  studentId: text('student_id').notNull(),
-  amountPaidPaise: integer('amount_paid_paise').notNull(),
-  paymentMethod: text('payment_method').notNull(), // CASH, UPI, BANK_TRANSFER
-  transactionReference: text('transaction_reference'),
-  paymentDate: text('payment_date').notNull(),
-  notes: text('notes'),
-  recordedByUserId: text('recorded_by_user_id'),
-  createdAt: text('created_at').notNull(),
-});
+```javascript
+// src/modules/finance/finance.repository.js
+/**
+ * Atomically persist a payment, allocations, receipt, and invoice status updates.
+ * D1 executes env.DB.batch([...]) as a single atomic transaction.
+ */
+export async function recordPaymentBatch(db, { payment, allocations, invoiceUpdates, receipt }) {
+  const statements = [
+    db.prepare(`
+      INSERT INTO payments (
+        id, student_id, amount_paid_paise, payment_method,
+        transaction_reference, payment_date, notes, recorded_by_user_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      payment.id,
+      payment.studentId,
+      payment.amountPaidPaise,
+      payment.paymentMethod,
+      payment.transactionReference ?? null,
+      payment.paymentDate,
+      payment.notes ?? null,
+      payment.recordedByUserId,
+      payment.createdAt,
+    ),
+    ...allocations.map((alloc) =>
+      db.prepare(`
+        INSERT INTO payment_allocations (id, payment_id, invoice_id, allocated_amount_paise, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(alloc.id, payment.id, alloc.invoiceId, alloc.allocatedAmountPaise, payment.createdAt),
+    ),
+    ...invoiceUpdates.map((inv) =>
+      db.prepare('UPDATE invoices SET status = ? WHERE id = ?')
+        .bind(inv.nextStatus, inv.invoiceId),
+    ),
+    db.prepare(`
+      INSERT INTO receipts (id, receipt_number, payment_id, issued_date, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(receipt.id, receipt.receiptNumber, payment.id, receipt.issuedDate, receipt.createdAt),
+  ];
 
-export const paymentAllocations = sqliteTable('payment_allocations', {
-  id: text('id').primaryKey(),
-  paymentId: text('payment_id').notNull().references(() => payments.id),
-  invoiceId: text('invoice_id').notNull().references(() => invoices.id),
-  allocatedAmountPaise: integer('allocated_amount_paise').notNull(),
-  createdAt: text('created_at').notNull(),
-});
+  return await db.batch(statements);
+}
 ```

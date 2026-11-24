@@ -1,0 +1,80 @@
+# ==============================================================================
+# Student Management System (SMS) — .gitignore
+# Stack: Next.js App Router (JS/JSX) · Cloudflare Workers · D1 · R2 · Wrangler
+# ==============================================================================
+
+# --- Dependencies & Package Managers ---
+node_modules/
+.pnpm-store/
+.pnp
+.pnp.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Environment Variables & Secrets (NEVER commit secrets) ---
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.pem
+*.key
+*.crt
+*.p12
+
+# --- Cloudflare Workers, Wrangler & Local Emulator State ---
+.wrangler/
+.mf/
+wrangler.toml.local
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+
+# --- Next.js & Deployment Adapter Build Outputs ---
+.next/
+out/
+.open-next/
+.vinext/
+.vercel/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# --- Local Uploads, Backups & Real Student Data (NEVER commit PII) ---
+uploads/
+backups/
+*.dump
+*backup*.sql
+*prod*.sql
+
+# --- Testing & Coverage Reports ---
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# --- Caches & Logs ---
+.cache/
+.eslintcache
+logs/
+*.log
+
+# --- OS & Editor Artifacts ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.tmp
+*.bak

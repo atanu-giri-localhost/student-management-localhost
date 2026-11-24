@@ -1,7 +1,7 @@
 # Development & Setup Guide
 
 **Project:** Student Management System (Coaching Institute + Mess Fee Management)  
-**Approved Stack:** Next.js App Router (JavaScript) · Cloudflare Workers · Cloudflare D1 · Drizzle ORM  
+**Approved Stack:** Next.js App Router (JavaScript) · Cloudflare Workers · Cloudflare D1 (Direct `env.DB` Bindings & Native SQL Migrations)  
 **Document Version:** 2.0 (Phase 0 Aligned)  
 
 ---
@@ -34,16 +34,19 @@ cp .env.example .env.local
 ### Step 3: Initialize Local Cloudflare D1 Database & Run Migrations
 Wrangler emulates Cloudflare D1 locally in `.wrangler/state/v3/d1`:
 ```bash
-# Generate migrations from Drizzle schema
-pnpm exec drizzle-kit generate
+# Apply versioned SQL migrations (migrations/*.sql) to local D1 SQLite database
+pnpm exec wrangler d1 migrations apply sms-coaching-d1 --local
 
-# Apply migrations to local D1 SQLite database
-pnpm exec wrangler d1 execute sms-coaching-d1 --local --file=./drizzle/migrations/0000_initial_schema.sql
+# Verify applied migrations and foreign-key enforcement
+pnpm exec wrangler d1 migrations list sms-coaching-d1 --local
+pnpm exec wrangler d1 execute sms-coaching-d1 --local --command="PRAGMA foreign_keys = ON; SELECT name FROM sqlite_master WHERE type='table';"
 ```
+
+*(When adding schema changes later, scaffold a new file with `pnpm exec wrangler d1 migrations create sms-coaching-d1 <migration_name>` and author pure SQLite DDL in `migrations/`.)*
 
 ### Step 4: Seed Initial Synthetic Demo Data
 ```bash
-pnpm exec wrangler d1 execute sms-coaching-d1 --local --file=./drizzle/seed.sql
+pnpm exec wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql
 ```
 
 ### Step 5: Start the Development Server
@@ -74,9 +77,9 @@ When `WHATSAPP_PROVIDER="MOCK"` is enabled, any registered phone number can use 
 Before writing application features, the team must complete and sign off the Phase 0 compatibility spike:
 
 1. [ ] **Deployment Adapter Spike:** Validate **vinext** with Next.js App Router, Server Components, Route Handlers, and session cookies on Workers. (Evaluate OpenNext if any incompatibility arises).
-2. [ ] **D1 & Drizzle JavaScript Compatibility:** Confirm Drizzle ORM loads schemas and configurations written purely in JavaScript (`.js`).
+2. [ ] **Native D1 Migrations & Foreign Keys:** Confirm clean database initialization via `wrangler d1 migrations apply sms-coaching-d1 --local`, `PRAGMA foreign_keys = ON;`, and parameterized `env.DB.prepare(...).bind(...)` queries in standard JavaScript (`.js`).
 3. [ ] **Request-Scoped Binding Access:** Verify `env.DB` and `env.STORAGE` are accessed cleanly per request without global singleton leaks.
-4. [ ] **Atomic D1 Batch Workflow:** Test multi-statement financial write rollback using `db.batch([...])`. Verify that if one statement fails, the entire transaction rolls back.
+4. [ ] **Atomic D1 Batch Workflow:** Test multi-statement financial write rollback using `env.DB.batch([...])`. Verify that if one statement fails (e.g., constraint violation), the entire transaction rolls back cleanly.
 5. [ ] **WhatsApp OTP Mock Adapter:** Confirm phone normalization, OTP hash storage, attempt limits (3 max), and 60-second resend throttling.
 
 ---
@@ -88,9 +91,10 @@ Before writing application features, the team must complete and sign off the Pha
 | `pnpm dev` | Starts local Next.js development server with local bindings. |
 | `pnpm build` | Compiles application via Cloudflare adapter (`vinext` / `open-next`). |
 | `pnpm preview` | Runs Cloudflare Workers local preview via Wrangler. |
-| `pnpm db:generate` | Uses Drizzle Kit to generate SQL migration files. |
-| `pnpm db:migrate:local` | Applies migrations to local D1 database. |
-| `pnpm db:migrate:prod` | Applies reviewed migrations to production D1 database. |
+| `pnpm db:migration:create` | Runs `wrangler d1 migrations create sms-coaching-d1` to create a numbered SQL migration in `migrations/`. |
+| `pnpm db:migrate:local` | Applies pending `migrations/*.sql` files to local D1 via `wrangler d1 migrations apply --local`. |
+| `pnpm db:migrate:prod` | Applies reviewed pending migrations to production D1 via `wrangler d1 migrations apply --remote`. |
+| `pnpm db:seed:local` | Executes synthetic `seeds/seed.sql` against local D1 via `wrangler d1 execute --local`. |
 | `pnpm test` | Runs unit and integration test suite via Vitest. |
 | `pnpm lint` | Runs ESLint and accessibility lint checks. |
 
@@ -104,3 +108,4 @@ Before writing application features, the team must complete and sign off the Pha
   * Verify that students cannot access any `/api/v1/finance/*` routes (`403 Forbidden`).
   * Verify that teachers cannot view fee data for students outside their assigned classes.
 * **OTP Rate-Limiting Tests:** Verify attempt throttling, resend cooldowns, and hash verification.
+* **D1 Migration & SQL Safety Tests:** Verify clean migrations from an empty local D1 database, `PRAGMA foreign_keys = ON` enforcement, `env.DB.batch([...])` rollback on constraint failures, parameterized `.prepare().bind()` queries (no SQL string interpolation), and zero ORM packages installed.
