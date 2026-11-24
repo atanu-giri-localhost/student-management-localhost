@@ -86,12 +86,11 @@ COOKIE_SECURE=false # Set true in production (HTTPS)
 COOKIE_NAME="sms_session"
 
 # ==========================================
-# WHATSAPP OTP CONFIGURATION
+# WHATSAPP OTP CONFIGURATION (Transport by Ogensync / MOCK)
 # ==========================================
-WHATSAPP_PROVIDER="MOCK" # In local dev: "MOCK" logs OTP to server console
-WHATSAPP_API_KEY="mock_whatsapp_key"
-WHATSAPP_PHONE_NUMBER_ID="mock_phone_id"
-WHATSAPP_TEMPLATE_NAME="sms_auth_otp"
+WHATSAPP_PROVIDER="MOCK" # "MOCK" (local/CI) or "OGENSYNC" (https://transport.ogensync.com)
+OGENSYNC_BASE_URL="https://transport.ogensync.com"
+WHATSAPP_API_KEY="mock_whatsapp_key" # Bearer token with messages:send scope
 OTP_EXPIRY_MINUTES=5
 OTP_MAX_ATTEMPTS=3
 OTP_RESEND_COOLDOWN_SECONDS=60
@@ -110,9 +109,8 @@ D1_DATABASE_NAME="sms-coaching-d1"
 SESSION_SECRET=dev_session_secret_at_least_32_characters_long_for_signing
 COOKIE_SECURE=false
 WHATSAPP_PROVIDER=MOCK
+OGENSYNC_BASE_URL=https://transport.ogensync.com
 WHATSAPP_API_KEY=mock_whatsapp_key
-WHATSAPP_PHONE_NUMBER_ID=mock_phone_id
-WHATSAPP_TEMPLATE_NAME=sms_auth_otp
 ```
 
 ---

@@ -35,3 +35,4 @@ APP_NAME = "Apex Coaching Institute SMS"
 DEFAULT_ACADEMIC_SESSION = "2026-2027"
 DEFAULT_DUE_DAY_OF_MONTH = 10
 WHATSAPP_PROVIDER = "MOCK"
+OGENSYNC_BASE_URL = "https://transport.ogensync.com"

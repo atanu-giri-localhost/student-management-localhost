@@ -36,60 +36,51 @@ flowchart TD
 
 ---
 
-## Phase 0 — Architecture Sign-Off & Open Decision Gate
+## Phase 0 — Architecture Sign-Off & Open Decision Gate *(COMPLETE — Provisional Pilot Baseline)*
 
 ### Goal & Prerequisites
 * **Goal:** Align engineering and institutional stakeholders on PRD v1.2, relational schema, RBAC boundaries, capacity sizing, and Cloudflare plan selection before building domain workflows.
 * **Prerequisites:** Phase 0 Architecture Pack ([PHASE_0_SIGNOFF_CHECKLIST.md](../Student_Management_System_Phase_0_Architecture_Pack/phase0/PHASE_0_SIGNOFF_CHECKLIST.md)) and zero-ORM D1 architecture baseline ([AGENTS.md](../AGENTS.md)).
 
 ### Blocking OPEN Decisions
-* **OD-01** (`SUPER_ADMIN` vs `COACHING_ADMIN` permissions)
-* **OD-02** (WhatsApp Business provider & OTP recovery)
-* **OD-03** (Teacher/student provisioning)
-* **OD-06** (Academic calendar & session naming)
-* **OD-13** (Student/teacher/concurrency capacity projections)
-* **OD-14** (Cloudflare Workers plan & RPO/RTO backup targets)
+* **OD-01**, **OD-02**, **OD-03**, **OD-06**, **OD-13**, **OD-14** — Recorded with **Provisional Pilot Defaults** in [OPEN_DECISIONS.md](./OPEN_DECISIONS.md) (revisable before production; live WhatsApp credentials for `OD-02` supplied in Phase 2).
 
-### Files to Review / Complete
-* `docs/OPEN_DECISIONS.md` — Stakeholder sign-off checklist updated with approved decisions
-* `Student_Management_System_Phase_0_Architecture_Pack/phase0/PHASE_0_SIGNOFF_CHECKLIST.md`
-
-### Commands
-```bash
-# Audit repo for zero forbidden ORMs / TS app files
-find src tests -type f \( -name '*.ts' -o -name '*.tsx' \) 2>/dev/null
-```
+### Files Completed
+* `docs/OPEN_DECISIONS.md` — Phase 0 sign-off summary and provisional pilot approvals recorded for `OD-01`..`OD-15`, `SUB-TT-01`, and `SUB-EX-01`.
+* `Student_Management_System_Phase_0_Architecture_Pack/phase0/PHASE_0_SIGNOFF_CHECKLIST.md` (baseline reference).
 
 ### Exit Gate & Tests
-* Stakeholder sign-off recorded in `docs/OPEN_DECISIONS.md` for Phase 0 blocking items (`OD-01`, `OD-02`, `OD-03`, `OD-06`, `OD-13`, `OD-14`).
-* Architecture team sign-off on 36-table schema (`docs/SQL_DDL_BLUEPRINT.md`) and RBAC contract (`docs/SECURITY_AND_RBAC_SPEC.md`).
+* [x] Stakeholder/provisional pilot sign-off recorded in `docs/OPEN_DECISIONS.md`.
+* [x] Architecture baseline verified on 36-table schema (`docs/SQL_DDL_BLUEPRINT.md`) and RBAC contract (`docs/SECURITY_AND_RBAC_SPEC.md`).
 
 ---
 
-## Phase 1 — Technical Foundation, `vinext` Spike & Design System Shell
+## Phase 1 — Technical Foundation, `vinext` Spike & Design System Shell *(COMPLETE)*
 
 ### Goal & Prerequisites
-* **Goal:** Validate Next.js App Router on Cloudflare Workers via `vinext`, initialize local D1 with `0001_initial_schema.sql` + `seeds/seed.sql`, prove `env.DB.batch([...])` rollback, and establish the reusable Tailwind CSS v4 + shadcn/ui shell.
+* **Goal:** Validate Next.js App Router on Cloudflare Workers via `vinext`, initialize local D1 with `0001_initial_schema.sql` + `seeds/seed.sql`, prove `env.DB.batch([...])` rollback, and establish shared security/validation helpers plus the reusable Tailwind CSS v4 UI shell.
 * **Prerequisites:** Phase 0 technical stack approval.
 
 ### Blocking OPEN Decisions
 * None for technical foundation; **OD-13** informs `env.DB.batch([...])` chunk size (`<= 250` statements recommended).
 
-### Files Created & Verified vs Remaining UI Shell Work
-**Already Implemented & Verified (Phase 1 Core Spike):**
-* Config & Environment: `package.json`, `vite.config.js`, `vitest.config.js`, `jsconfig.json`, `next.config.mjs`, `postcss.config.mjs`, `eslint.config.mjs`, `wrangler.toml`, `.env.example`, `.dev.vars.example`
-* Database DDL & Seed: `migrations/0001_initial_schema.sql` (36 tables, 50 explicit indexes), `seeds/seed.sql` (98 synthetic rows)
-* Shared Runtime Helpers: `src/lib/cloudflare/bindings.js`, `src/lib/http/response.js`, `src/lib/money/format.js`
-* App Shell & Health Route: `src/app/globals.css`, `src/app/layout.jsx`, `src/app/page.jsx`, `src/app/api/v1/health/route.js`
-* Spike Tests: `tests/unit/money.test.js`, `tests/unit/http-and-bindings.test.js`, `tests/integration/d1-batch.test.js`
-
-**Remaining Phase 1 UI / Shared Library Files to Create Before Phase 2:**
-* `src/lib/http/csrf.js` — Same-origin / CSRF guard for mutating handlers
-* `src/lib/validation/common.js` — Shared UUID v4, ISO date (`YYYY-MM-DD`), pagination, and E.164 phone Zod schemas
-* `src/lib/dates/format.js` — UTC ISO-8601 and `YYYY-MM-DD` helper functions
-* `src/components/ui/` — shadcn/ui JavaScript primitives (`button.jsx`, `input.jsx`, `badge.jsx`, `card.jsx`, `dialog.jsx`, `table.jsx`, `select.jsx`, `toast.jsx`)
-* `src/components/layout/portal-shell.jsx`, `src/components/layout/sidebar.jsx`, `src/components/layout/topbar.jsx` — Responsive desktop/tablet navigation shells (presentation only)
-* `src/components/data-display/stat-card.jsx`, `src/components/data-display/empty-state.jsx`, `src/components/data-display/error-banner.jsx`
+### Completed Phase 1 Deliverables
+* **Config & Environment:** `package.json`, `vite.config.js`, `vitest.config.js`, `jsconfig.json`, `next.config.mjs`, `postcss.config.mjs`, `eslint.config.mjs`, `wrangler.toml`, `.env.example`, `.dev.vars.example`
+* **Database DDL & Seed:** `migrations/0001_initial_schema.sql` (36 tables, 50 explicit indexes), `seeds/seed.sql` (98 synthetic rows)
+* **Shared Runtime Helpers:**
+  * `src/lib/cloudflare/bindings.js` — request-scoped `resolveWorkerEnv()`, `getDb()`, `getStorage()`
+  * `src/lib/http/response.js` — `createRequestId()`, `jsonOk()`, `jsonPaginated()`, `jsonError()`
+  * `src/lib/http/csrf.js` — Same-origin / CSRF guard (`assertSameOrigin()`) for mutating requests
+  * `src/lib/money/format.js` — `formatINR(amountPaise)` and integer paise math helpers
+  * `src/lib/validation/common.js` — Shared UUID v4, strict calendar date (`YYYY-MM-DD`), pagination, E.164 phone normalizer, and Zod body parser
+  * `src/lib/dates/format.js` — UTC ISO-8601 and `YYYY-MM-DD` helper functions
+  * `src/lib/utils.js` — `cn()` CSS class utility
+* **UI Primitives & Presentation Shell (`src/components/`):**
+  * `src/components/ui/` — `button.jsx`, `input.jsx`, `label.jsx`, `badge.jsx`, `card.jsx`, `dialog.jsx`, `table.jsx`, `select.jsx`, `toast.jsx`
+  * `src/components/layout/` — `nav-config.js`, `portal-shell.jsx`, `sidebar.jsx`, `topbar.jsx`
+  * `src/components/data-display/` — `stat-card.jsx`, `empty-state.jsx`, `error-banner.jsx`, `loading-skeleton.jsx`
+* **App Shell & Health Route:** `src/app/globals.css`, `src/app/layout.jsx`, `src/app/page.jsx`, `src/app/api/v1/health/route.js`
+* **Unit & Integration Tests:** `tests/unit/money.test.js`, `tests/unit/http-and-bindings.test.js`, `tests/unit/csrf.test.js`, `tests/unit/validation-and-dates.test.js`, `tests/integration/d1-batch.test.js`
 
 ### Commands
 ```bash
@@ -110,7 +101,7 @@ npm run preview
 
 ---
 
-## Phase 2 — Identity, WhatsApp OTP Auth, Sessions & Core RBAC
+## Phase 2 — Identity, WhatsApp OTP Auth, Sessions & Core RBAC *(COMPLETE — Tested with MOCK & Ogensync HTTP Unit Suite; Live `.dev.vars` Key Pending)*
 
 ### Goal & Prerequisites
 * **Goal:** Deliver passwordless WhatsApp OTP login, stateless D1-backed throttling, signed `HttpOnly` `sms_session` cookies, session management, user/role administration, and shared RBAC middleware/helpers.
@@ -118,14 +109,15 @@ npm run preview
 
 ### Blocking OPEN Decisions
 * **OD-01** (`SUPER_ADMIN` vs `COACHING_ADMIN` boundaries on `/api/v1/users*` and `/api/v1/auth/session/revoke`)
-* **OD-02** (Pinned WhatsApp Business provider `META` vs `TWILIO`, approved template, recovery flow)
+* **OD-02** (WhatsApp Business delivery integrated via **Transport by Ogensync** `https://transport.ogensync.com/v1/messages`; recovery flow & formal confirmation remain `OPEN`)
 * **OD-03** (Teacher & student onboarding activation flow)
 
-### Exact Files to Create
+### Exact Files Created
+* `migrations/0002_otp_provider_job_id.sql` — Adds `provider_job_id` column and partial index on `otp_challenges`
 * `src/lib/auth/crypto.js` — `crypto.getRandomValues` 6-digit OTP generator, Web Crypto HMAC-SHA256 / SHA-256 hashing, constant-time compare
 * `src/lib/auth/session.js` — Cookie parsing, `Set-Cookie` builder (`HttpOnly`, `SameSite=Lax`, `Secure`), session context hydration, `requireAuth()`, `requireRole()`
-* `src/lib/validation/phone.js` — E.164 (`+91...`) normalizer & Zod schema
-* `src/lib/whatsapp/provider.js`, `src/lib/whatsapp/mock.js`, `src/lib/whatsapp/meta.js`, `src/lib/whatsapp/twilio.js` — Provider abstraction (`MOCK`, `META`, `TWILIO`)
+* `src/lib/validation/common.js` — Shared Zod schemas including E.164 (`+91...`) phone normalizer (`normalizePhoneToE164`, `e164PhoneSchema`)
+* `src/lib/whatsapp/provider.js`, `src/lib/whatsapp/mock.js`, `src/lib/whatsapp/ogensync.js` — Provider abstraction (`MOCK` + `OGENSYNC` RelayWA `POST /v1/messages` & `GET /v1/session`)
 * `src/modules/auth/auth.schemas.js`, `src/modules/auth/auth.repository.js`, `src/modules/auth/auth.service.js`, `src/modules/auth/auth.permissions.js`
 * `src/modules/users/users.schemas.js`, `src/modules/users/users.repository.js`, `src/modules/users/users.service.js`, `src/modules/users/users.permissions.js`
 * `src/modules/audit/audit.repository.js`, `src/modules/audit/audit.service.js`
@@ -141,11 +133,12 @@ npm run preview
 * UI Pages:
   * `src/app/(auth)/login/page.jsx`
   * `src/app/(auth)/verify-otp/page.jsx`
+  * `src/app/dashboard/page.jsx`
 
 ### Commands
 ```bash
-npm test -- tests/unit/auth-crypto.test.js tests/integration/auth-otp.test.js
-npm run lint && npm run build
+npm test -- tests/unit/auth-crypto.test.js tests/unit/whatsapp-ogensync.test.js tests/integration/auth-otp.test.js
+npm run lint && npm test && npm run build
 ```
 
 ### Exit Gate & Tests
