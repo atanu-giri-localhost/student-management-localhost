@@ -63,7 +63,7 @@ export function Sidebar({
 
   return (
     <>
-      <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white lg:block lg:w-64 dark:border-slate-800 dark:bg-slate-900">
+      <aside className="hidden fixed inset-y-0 left-0 z-20 w-60 border-r border-slate-200 bg-white lg:block lg:w-64 dark:border-slate-800 dark:bg-slate-900">
         {navContent}
       </aside>
 

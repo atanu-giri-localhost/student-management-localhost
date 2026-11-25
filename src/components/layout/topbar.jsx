@@ -40,7 +40,7 @@ export function Topbar({
             Menu
           </Button>
         ) : null}
-        <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
       </div>
 
       <div className="flex items-center gap-3">
@@ -53,8 +53,8 @@ export function Topbar({
         ) : null}
         {userLabel ? (
           <div className="hidden text-right sm:block">
-            <p className="text-sm font-medium text-slate-900">{userLabel}</p>
-            {roleLabel ? <p className="text-xs text-slate-500">{roleLabel}</p> : null}
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{userLabel}</p>
+            {roleLabel ? <p className="text-xs text-slate-500 dark:text-slate-400">{roleLabel}</p> : null}
           </div>
         ) : null}
         {onLogout ? (

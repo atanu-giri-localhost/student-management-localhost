@@ -29,13 +29,13 @@ export function ErrorBanner({
     >
       <div>
         <p className="font-semibold">{title}</p>
-        <p className="mt-0.5 text-rose-800">{message}</p>
+        <p className="mt-0.5 text-rose-800 dark:text-rose-300">{message}</p>
         {requestId ? (
-          <p className="mt-1 font-mono text-xs text-rose-700">Reference ID: {requestId}</p>
+          <p className="mt-1 font-mono text-xs text-rose-700 dark:text-rose-400">Reference ID: {requestId}</p>
         ) : null}
       </div>
       {onRetry ? (
-        <Button variant="outline" size="sm" onClick={onRetry} className="shrink-0 bg-white">
+        <Button variant="outline" size="sm" onClick={onRetry} className="shrink-0 bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600">
           Try again
         </Button>
       ) : null}
