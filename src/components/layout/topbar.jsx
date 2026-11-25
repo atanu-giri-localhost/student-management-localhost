@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 /**
  * Top bar header for authenticated role portals.
@@ -26,7 +27,7 @@ export function Topbar({
   rightSlot,
 }) {
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 sm:px-6">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:px-4 dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center gap-3">
         {onOpenMobileMenu ? (
           <Button
@@ -40,11 +41,16 @@ export function Topbar({
           </Button>
         ) : null}
         <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-        {sessionLabel ? <Badge variant="primary">Session {sessionLabel}</Badge> : null}
       </div>
 
       <div className="flex items-center gap-3">
         {rightSlot}
+        <ThemeToggle />
+        {sessionLabel ? (
+          <Badge variant="primary" className="hidden sm:block">
+            Session {sessionLabel}
+          </Badge>
+        ) : null}
         {userLabel ? (
           <div className="hidden text-right sm:block">
             <p className="text-sm font-medium text-slate-900">{userLabel}</p>

@@ -22,12 +22,12 @@ export function StatCard({
   className,
 }) {
   return (
-    <div className={cn('rounded-xl border border-slate-200 bg-white p-5 shadow-xs', className)}>
-      <div className="flex items-start justify-between gap-3">
+    <div className={cn('rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900', className)}>
+      <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium text-slate-500">{title}</p>
         {badgeText ? <Badge variant={badgeVariant}>{badgeText}</Badge> : null}
       </div>
-      <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{value}</p>
+      <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900">{value}</p>
       {subtitle ? <p className="mt-1 text-xs text-slate-500">{subtitle}</p> : null}
     </div>
   );

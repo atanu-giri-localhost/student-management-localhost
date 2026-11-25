@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { getNavItemsForRole } from '@/components/layout/nav-config';
+import { PageContainer } from '@/components/layout/PageContainer';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 
@@ -35,7 +36,7 @@ export function PortalShell({
   const navItems = getNavItemsForRole(roleName);
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900">
+    <div className="flex min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <Sidebar
         items={navItems}
         activePath={activePath}
@@ -54,7 +55,7 @@ export function PortalShell({
           onLogout={onLogout}
           rightSlot={topbarRightSlot}
         />
-        <main className="flex-1 p-4 sm:p-6">{children}</main>
+        <PageContainer size="wide" padding="default">{children}</PageContainer>
       </div>
     </div>
   );

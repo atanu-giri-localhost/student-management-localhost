@@ -39,16 +39,16 @@ export function Dialog({ open, onClose, title, description, className, children 
         type="button"
         aria-label="Close modal overlay"
         onClick={() => onClose?.()}
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-[1px]"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-[1px] dark:bg-slate-950/70"
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cn(
-          'relative z-10 w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl',
-          className
-        )}
+          className={cn(
+            'relative z-10 w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900',
+            className
+          )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
           <div>

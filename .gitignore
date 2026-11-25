@@ -64,12 +64,13 @@ test-results/
 
 # --- Caches & Logs ---
 .cache/
+.vite/
 .eslintcache
 logs/
 *.log
 
-# --- OS & Editor Artifacts ---
-.DS_Store
+# --- Kilo / Agent Manager (worktree & session state) ---
+.kilo/
 Thumbs.db
 Desktop.ini
 .vscode/

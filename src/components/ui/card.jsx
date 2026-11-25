@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 export function Card({ className, children, ...props }) {
   return (
     <div
-      className={cn('rounded-xl border border-slate-200 bg-white shadow-xs', className)}
+      className={cn('rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900', className)}
       {...props}
     >
       {children}
@@ -13,7 +13,7 @@ export function Card({ className, children, ...props }) {
 
 export function CardHeader({ className, children, ...props }) {
   return (
-    <div className={cn('flex flex-col gap-1.5 border-b border-slate-100 px-6 py-4', className)} {...props}>
+    <div className={cn('flex flex-col gap-1.5 px-5 py-3.5', className)} {...props}>
       {children}
     </div>
   );
@@ -37,7 +37,7 @@ export function CardDescription({ className, children, ...props }) {
 
 export function CardContent({ className, children, ...props }) {
   return (
-    <div className={cn('px-6 py-5', className)} {...props}>
+    <div className={cn('px-5 py-4', className)} {...props}>
       {children}
     </div>
   );

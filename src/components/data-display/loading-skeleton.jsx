@@ -10,7 +10,7 @@ export function LoadingSkeleton({ rows = 3, className }) {
     <div
       role="status"
       aria-label="Loading content"
-      className={cn('space-y-3 rounded-xl border border-slate-200 bg-white p-5', className)}
+      className={cn('space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900', className)}
     >
       <div className="h-4 w-1/3 animate-pulse rounded bg-slate-200" />
       {Array.from({ length: rows }).map((_, index) => (

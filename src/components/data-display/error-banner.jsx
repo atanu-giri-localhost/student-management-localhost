@@ -23,7 +23,7 @@ export function ErrorBanner({
     <div
       role="alert"
       className={cn(
-        'flex flex-col justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 sm:flex-row sm:items-center',
+        'flex flex-col justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 sm:flex-row sm:items-center dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200',
         className
       )}
     >
