@@ -1,5 +1,6 @@
+import { hydrateUserProfiles } from '@/lib/auth/profile-hydration';
 import { nowIso } from '@/lib/dates/format';
-import { createAuditStatement } from '@/modules/audit/audit.service';
+import { createAuditOutboxStatement } from '@/modules/audit/audit.service';
 import {
   createUserBatch,
   deactivateUserBatch,
@@ -68,7 +69,7 @@ export async function createUserService(db, actorSession, input, meta) {
     roleId: role.id,
   }));
 
-  const auditStatement = createAuditStatement(db, {
+  const auditStatement = createAuditOutboxStatement(db, {
     actorUserId: actorSession.userId,
     action: 'CREATE',
     entityType: 'USER',
@@ -108,21 +109,29 @@ export async function createUserService(db, actorSession, input, meta) {
     throw error;
   }
 
-  return await findUserDetailById(db, newUserId);
+  return await getUserByIdService(db, newUserId, meta.workerEnv);
 }
 
 /**
- * Fetch a single user detail by ID.
+ * Fetch a single user detail by ID from `DB_IDENTITY` and hydrate linked domain profiles.
  *
  * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {string} userId
+ * @param {Record<string, unknown>} [workerEnv]
  */
-export async function getUserByIdService(db, userId) {
+export async function getUserByIdService(db, userId, workerEnv = {}) {
   const user = await findUserDetailById(db, userId);
   if (!user) {
     throw new UsersServiceError('NOT_FOUND', 'User not found.', 404);
   }
-  return user;
+  const profiles = await hydrateUserProfiles(workerEnv, {
+    userId: user.id,
+    roles: user.roles,
+  });
+  return {
+    ...user,
+    profiles,
+  };
 }
 
 /**
@@ -159,7 +168,7 @@ export async function updateUserService(db, actorSession, targetUserId, input, m
     Array.isArray(input.roles);
 
   const timestamp = nowIso();
-  const auditStatement = createAuditStatement(db, {
+  const auditStatement = createAuditOutboxStatement(db, {
     actorUserId: actorSession.userId,
     action: 'UPDATE',
     entityType: 'USER',
@@ -202,16 +211,16 @@ export async function updateUserService(db, actorSession, targetUserId, input, m
     throw error;
   }
 
-  return await findUserDetailById(db, targetUserId);
+  return await getUserByIdService(db, targetUserId, meta.workerEnv);
 }
 
 /**
- * Deactivate a user account (`is_active = 0`), revoke active sessions, and log audit entry.
+ * Deactivate a user account (`is_active = 0`), revoke active sessions, and write `audit_outbox` entry.
  *
  * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {{ userId: string }} actorSession
  * @param {string} targetUserId
- * @param {{ clientIp: string, requestId: string }} meta
+ * @param {{ clientIp: string, requestId: string, workerEnv?: Record<string, unknown> }} meta
  */
 export async function deactivateUserService(db, actorSession, targetUserId, meta) {
   const existing = await findUserDetailById(db, targetUserId);
@@ -223,7 +232,7 @@ export async function deactivateUserService(db, actorSession, targetUserId, meta
   }
 
   const timestamp = nowIso();
-  const auditStatement = createAuditStatement(db, {
+  const auditStatement = createAuditOutboxStatement(db, {
     actorUserId: actorSession.userId,
     action: 'UPDATE',
     entityType: 'USER',
@@ -241,5 +250,5 @@ export async function deactivateUserService(db, actorSession, targetUserId, meta
     auditStatement,
   });
 
-  return await findUserDetailById(db, targetUserId);
+  return await getUserByIdService(db, targetUserId, meta.workerEnv);
 }

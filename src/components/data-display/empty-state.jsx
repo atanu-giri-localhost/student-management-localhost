@@ -18,8 +18,8 @@ export function EmptyState({ title, description, action, className }) {
         className
       )}
     >
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-      {description ? <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p> : null}
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+      {description ? <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );

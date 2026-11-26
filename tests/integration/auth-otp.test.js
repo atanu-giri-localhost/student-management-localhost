@@ -1,12 +1,8 @@
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import { hashOtp, hashSessionToken } from '@/lib/auth/crypto';
+import { hydrateUserProfiles } from '@/lib/auth/profile-hydration';
 import { requireAuth } from '@/lib/auth/session';
-import { getDb } from '@/lib/cloudflare/bindings';
+import { D1_BINDINGS } from '@/lib/cloudflare/bindings';
 import { findActiveSessionByTokenHash } from '@/modules/auth/auth.repository';
 import { assertCanRevokeSessions } from '@/modules/auth/auth.permissions';
 import {
@@ -19,58 +15,24 @@ import { assertCanManageUsers } from '@/modules/users/users.permissions';
 import {
   createUserService,
   deactivateUserService,
+  getUserByIdService,
   listUsersService,
   updateUserService,
 } from '@/modules/users/users.service';
+import { createMultiD1Proxy } from '../helpers/multi-d1-proxy';
 
-const WRANGLER_BIN = path.resolve(process.cwd(), 'node_modules/.bin/wrangler');
 const TEST_SECRET = 'integration_test_session_secret_32chars';
 
-let tmpPersistDir;
-let proxy;
-let db;
+let ctx;
+let identityDb;
 let testEnv;
 
-function runWrangler(args) {
-  execFileSync(WRANGLER_BIN, args, {
-    cwd: process.cwd(),
-    stdio: 'pipe',
-    env: { ...process.env, CI: 'true' },
-  });
-}
-
-describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integration', () => {
+describe('Phase B2 WhatsApp OTP, Session Lifecycle, Cross-D1 Hydration, Audit Outbox & Users RBAC', () => {
   beforeAll(async () => {
-    tmpPersistDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sms-auth-d1-'));
-    runWrangler([
-      'd1',
-      'migrations',
-      'apply',
-      'sms-coaching-d1',
-      '--local',
-      '--force',
-      '--persist-to',
-      tmpPersistDir,
-    ]);
-    runWrangler([
-      'd1',
-      'execute',
-      'sms-coaching-d1',
-      '--local',
-      '--persist-to',
-      tmpPersistDir,
-      '--file',
-      './seeds/seed.sql',
-    ]);
-
-    proxy = await getPlatformProxy({
-      configPath: './wrangler.toml',
-      persist: { path: path.join(tmpPersistDir, 'v3') },
-    });
-
-    db = getDb(proxy.env);
+    ctx = await createMultiD1Proxy({ applyMigrations: true, applySeeds: true });
+    identityDb = ctx.dbs[D1_BINDINGS.IDENTITY];
     testEnv = {
-      ...proxy.env,
+      ...ctx.env,
       SESSION_SECRET: TEST_SECRET,
       WHATSAPP_PROVIDER: 'MOCK',
       ENVIRONMENT: 'test',
@@ -78,40 +40,45 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
       OTP_MAX_ATTEMPTS: '3',
       OTP_RESEND_COOLDOWN_SECONDS: '60',
     };
-  }, 30000);
+  }, 60000);
 
   afterAll(async () => {
     vi.restoreAllMocks();
-    if (proxy) await proxy.dispose();
-    if (tmpPersistDir) fs.rmSync(tmpPersistDir, { recursive: true, force: true });
+    if (ctx) {
+      await ctx.cleanup();
+    }
   });
 
-  it('includes provider_job_id column from migration 0002 on otp_challenges', async () => {
-    const cols = await db.prepare('PRAGMA table_info(otp_challenges)').all();
+  it('includes provider_job_id column on DB_IDENTITY otp_challenges and audit_outbox table', async () => {
+    const cols = await identityDb.prepare('PRAGMA table_info(otp_challenges)').all();
     const names = (cols.results || []).map((c) => c.name);
     expect(names).toContain('provider_job_id');
+
+    const outboxTable = await identityDb
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'audit_outbox'")
+      .first();
+    expect(outboxTable?.name).toBe('audit_outbox');
   });
 
   it('prevents account enumeration and never dispatches WhatsApp for unregistered phones', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
     const resUnregistered = await requestOtpService(
-      db,
+      identityDb,
       { ...testEnv, WHATSAPP_PROVIDER: 'OGENSYNC', WHATSAPP_API_KEY: 'trn_live_dummy' },
       { phoneNormalized: '+919000099999', clientIp: '10.0.0.10' }
     );
     const resRegistered = await requestOtpService(
-      db,
+      identityDb,
       testEnv,
       { phoneNormalized: '+919999900001', clientIp: '10.0.0.11' }
     );
 
     expect(resUnregistered).toEqual(resRegistered);
     expect(resUnregistered.cooldownSeconds).toBe(60);
-    // Unregistered number must NOT call external Ogensync fetch.
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    const row = await db
+    const row = await identityDb
       .prepare('SELECT delivery_status, provider_job_id FROM otp_challenges WHERE phone_normalized = ?')
       .bind('+919000099999')
       .first();
@@ -134,7 +101,7 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     );
 
     await requestOtpService(
-      db,
+      identityDb,
       {
         ...testEnv,
         WHATSAPP_PROVIDER: 'OGENSYNC',
@@ -145,7 +112,7 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     );
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const challenge = await db
+    const challenge = await identityDb
       .prepare(
         'SELECT otp_hash, delivery_status, provider_job_id FROM otp_challenges WHERE phone_normalized = ? ORDER BY created_at DESC LIMIT 1'
       )
@@ -161,23 +128,22 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     const phone = '+919876500001';
     const baseTime = new Date('2026-11-25T10:00:00.000Z');
 
-    await requestOtpService(db, testEnv, {
+    await requestOtpService(identityDb, testEnv, {
       phoneNormalized: phone,
       clientIp: '10.0.0.50',
       nowDate: baseTime,
     });
 
     await expect(
-      requestOtpService(db, testEnv, {
+      requestOtpService(identityDb, testEnv, {
         phoneNormalized: phone,
         clientIp: '10.0.0.51',
         nowDate: new Date(baseTime.getTime() + 30_000),
       })
     ).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 });
 
-    // Exhaust 5 requests/hour from IP 10.0.0.99 across distinct phones
     for (let i = 0; i < 5; i++) {
-      await requestOtpService(db, testEnv, {
+      await requestOtpService(identityDb, testEnv, {
         phoneNormalized: `+91980000010${i}`,
         clientIp: '10.0.0.99',
         nowDate: new Date(baseTime.getTime() + i * 1000),
@@ -185,7 +151,7 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     }
 
     await expect(
-      requestOtpService(db, testEnv, {
+      requestOtpService(identityDb, testEnv, {
         phoneNormalized: '+919800000199',
         clientIp: '10.0.0.99',
         nowDate: new Date(baseTime.getTime() + 10_000),
@@ -193,14 +159,14 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     ).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 });
   });
 
-  it('enforces OTP expiry, max 3 attempts, single-use replay protection, session hydration, and logout', async () => {
-    const phone = '+919876510001';
+  it('enforces OTP expiry, max 3 attempts, replay protection, cross-D1 profile hydration, and logout', async () => {
+    const phone = '+919876510001'; // Aarav Sharma (STUDENT)
     const issuedAt = new Date('2026-11-25T12:00:00.000Z');
     const knownOtp = '654321';
     const challengeId = crypto.randomUUID();
     const otpHash = await hashOtp(TEST_SECRET, challengeId, phone, knownOtp);
 
-    await db
+    await identityDb
       .prepare(
         `INSERT INTO otp_challenges (
           id, phone_normalized, otp_hash, expires_at, attempts, consumed_at,
@@ -218,7 +184,7 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
 
     // 1. Expired OTP rejected
     await expect(
-      verifyOtpService(db, testEnv, {
+      verifyOtpService(identityDb, testEnv, {
         phoneNormalized: phone,
         otp: knownOtp,
         userAgent: 'Vitest',
@@ -230,7 +196,7 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     // 2. Wrong OTP increments attempts twice, then valid OTP succeeds on 3rd try
     for (let wrong = 0; wrong < 2; wrong++) {
       await expect(
-        verifyOtpService(db, testEnv, {
+        verifyOtpService(identityDb, testEnv, {
           phoneNormalized: phone,
           otp: '000000',
           userAgent: 'Vitest',
@@ -240,7 +206,7 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
       ).rejects.toMatchObject({ code: 'INVALID_OTP', status: 401 });
     }
 
-    const verified = await verifyOtpService(db, testEnv, {
+    const verified = await verifyOtpService(identityDb, testEnv, {
       phoneNormalized: phone,
       otp: knownOtp,
       userAgent: 'Vitest',
@@ -249,11 +215,13 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     });
 
     expect(verified.session.roles).toContain('STUDENT');
-    expect(verified.session.profiles.studentId).toBeTruthy();
+    expect(verified.session.profiles.studentId).toBe('14000000-0000-4000-8000-000000000001');
+    expect(verified.session.profiles.parentProfileId).toBeNull();
+    expect(verified.session.profiles.teacherProfileId).toBeNull();
 
     // 3. Replay with the same OTP fails
     await expect(
-      verifyOtpService(db, testEnv, {
+      verifyOtpService(identityDb, testEnv, {
         phoneNormalized: phone,
         otp: knownOtp,
         userAgent: 'Vitest',
@@ -263,12 +231,12 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     ).rejects.toMatchObject({ code: 'INVALID_OTP', status: 401 });
 
     // 4. Logout revokes active session
-    await logoutService(db, {
+    await logoutService(identityDb, {
       sessionId: verified.session.sessionId,
       nowDate: new Date(issuedAt.getTime() + 120_000),
     });
     const afterLogout = await findActiveSessionByTokenHash(
-      db,
+      identityDb,
       await hashSessionToken(verified.rawSessionToken),
       new Date(issuedAt.getTime() + 125_000).toISOString()
     );
@@ -277,7 +245,7 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     // 5. Attempt limit lockout after 3 wrong guesses
     const lockChallengeId = crypto.randomUUID();
     const lockHash = await hashOtp(TEST_SECRET, lockChallengeId, phone, '111222');
-    await db
+    await identityDb
       .prepare(
         `INSERT INTO otp_challenges (
           id, phone_normalized, otp_hash, expires_at, attempts, consumed_at,
@@ -295,7 +263,7 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
 
     for (let i = 0; i < 3; i++) {
       await expect(
-        verifyOtpService(db, testEnv, {
+        verifyOtpService(identityDb, testEnv, {
           phoneNormalized: phone,
           otp: '999999',
           userAgent: 'Vitest',
@@ -305,9 +273,8 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
       ).rejects.toMatchObject({ code: 'INVALID_OTP', status: 401 });
     }
 
-    // 4th attempt with the CORRECT OTP must still fail
     await expect(
-      verifyOtpService(db, testEnv, {
+      verifyOtpService(identityDb, testEnv, {
         phoneNormalized: phone,
         otp: '111222',
         userAgent: 'Vitest',
@@ -317,7 +284,41 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     ).rejects.toMatchObject({ code: 'INVALID_OTP', status: 401 });
   });
 
-  it('enforces SUPER_ADMIN RBAC on users/revoke, revokes sessions on role change or deactivation, and hydrates cookie auth', async () => {
+  it('hydrates TEACHER and PARENT profiles across DB_ACADEMICS and DB_STUDENTS and degrades gracefully if profile DBs are unavailable', async () => {
+    const teacherProfiles = await hydrateUserProfiles(testEnv, {
+      userId: '11000000-0000-4000-8000-000000000003',
+      roles: ['TEACHER'],
+    });
+    expect(teacherProfiles).toEqual({
+      parentProfileId: null,
+      teacherProfileId: '1b000000-0000-4000-8000-000000000001',
+      studentId: null,
+    });
+
+    const parentProfiles = await hydrateUserProfiles(testEnv, {
+      userId: '11000000-0000-4000-8000-000000000006',
+      roles: ['PARENT'],
+    });
+    expect(parentProfiles).toEqual({
+      parentProfileId: '13000000-0000-4000-8000-000000000001',
+      teacherProfileId: null,
+      studentId: null,
+    });
+
+    // Degraded DB_STUDENTS / DB_ACADEMICS returns null profile IDs without breaking identity
+    const degradedEnv = { ...testEnv, DB_STUDENTS: undefined, DB_ACADEMICS: undefined };
+    const degradedTeacher = await hydrateUserProfiles(degradedEnv, {
+      userId: '11000000-0000-4000-8000-000000000003',
+      roles: ['TEACHER'],
+    });
+    expect(degradedTeacher).toEqual({
+      parentProfileId: null,
+      teacherProfileId: null,
+      studentId: null,
+    });
+  });
+
+  it('enforces SUPER_ADMIN RBAC on users/revoke, revokes sessions on role change or deactivation, hydrates user detail, and writes DB_IDENTITY.audit_outbox', async () => {
     const superAdminSession = {
       userId: '11000000-0000-4000-8000-000000000001',
       roles: ['SUPER_ADMIN'],
@@ -331,36 +332,66 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     expect(assertCanManageUsers(coachingAdminSession)?.status).toBe(403);
     expect(assertCanRevokeSessions({ roles: ['TEACHER'] })?.status).toBe(403);
 
+    // Seeded teacher detail hydrates teacherProfileId across DB_ACADEMICS
+    const seededTeacher = await getUserByIdService(
+      identityDb,
+      '11000000-0000-4000-8000-000000000003',
+      testEnv
+    );
+    expect(seededTeacher.profiles.teacherProfileId).toBe('1b000000-0000-4000-8000-000000000001');
+
     // Create user + duplicate conflict check
     const created = await createUserService(
-      db,
+      identityDb,
       superAdminSession,
       { phone: '+919811122233', email: 'newstaff@apex.test', roles: ['TEACHER'], isActive: true },
-      { clientIp: '10.0.0.70', requestId: 'req_usr_1' }
+      { clientIp: '10.0.0.70', requestId: 'req_usr_1', workerEnv: testEnv }
     );
     expect(created.phoneNormalized).toBe('+919811122233');
     expect(created.roles).toEqual(['TEACHER']);
 
     await expect(
       createUserService(
-        db,
+        identityDb,
         superAdminSession,
         { phone: '+919811122233', roles: ['TEACHER'], isActive: true },
-        { clientIp: '10.0.0.70', requestId: 'req_usr_dup' }
+        { clientIp: '10.0.0.70', requestId: 'req_usr_dup', workerEnv: testEnv }
       )
     ).rejects.toMatchObject({ code: 'CONFLICT', status: 409 });
 
-    // Create an active session for new user & test requireAuth cookie hydration
+    // Create active + expired sessions and test requireAuth
     const rawToken = 'test_raw_session_token_value_123456';
     const tokenHash = await hashSessionToken(rawToken);
     const futureExpiry = new Date(Date.now() + 86_400_000).toISOString();
-    await db
+    await identityDb
       .prepare(
         `INSERT INTO sessions (id, user_id, token_hash, expires_at, revoked_at, user_agent, ip_address, created_at)
          VALUES (?, ?, ?, ?, NULL, 'Vitest', '10.0.0.70', ?)`
       )
       .bind(crypto.randomUUID(), created.id, tokenHash, futureExpiry, new Date().toISOString())
       .run();
+
+    const expiredRawToken = 'test_expired_session_token_value_123';
+    await identityDb
+      .prepare(
+        `INSERT INTO sessions (id, user_id, token_hash, expires_at, revoked_at, user_agent, ip_address, created_at)
+         VALUES (?, ?, ?, ?, NULL, 'Vitest', '10.0.0.70', ?)`
+      )
+      .bind(
+        crypto.randomUUID(),
+        created.id,
+        await hashSessionToken(expiredRawToken),
+        '2020-01-01T00:00:00.000Z',
+        new Date().toISOString()
+      )
+      .run();
+
+    const expiredReq = new Request('http://localhost:3000/api/v1/auth/session', {
+      headers: { cookie: `sms_session=${expiredRawToken}` },
+    });
+    const expiredAuth = await requireAuth(expiredReq, { explicitEnv: testEnv });
+    expect(expiredAuth.ok).toBe(false);
+    expect(expiredAuth.response.status).toBe(401);
 
     const authedReq = new Request('http://localhost:3000/api/v1/auth/session', {
       headers: { cookie: `sms_session=${rawToken}` },
@@ -371,11 +402,11 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
 
     // Role update atomically revokes active sessions
     const updated = await updateUserService(
-      db,
+      identityDb,
       superAdminSession,
       created.id,
       { roles: ['COACHING_ADMIN'] },
-      { clientIp: '10.0.0.70', requestId: 'req_usr_upd' }
+      { clientIp: '10.0.0.70', requestId: 'req_usr_upd', workerEnv: testEnv }
     );
     expect(updated.roles).toEqual(['COACHING_ADMIN']);
 
@@ -383,26 +414,28 @@ describe('Phase 2 WhatsApp OTP, Session Lifecycle, Audit & Users RBAC Integratio
     expect(authAfterRoleChange.ok).toBe(false);
     expect(authAfterRoleChange.response.status).toBe(401);
 
-    // Administrative revoke + deactivation + audit_logs check
-    await revokeUserSessionsService(db, {
+    // Administrative revoke + deactivation + DB_IDENTITY.audit_outbox check
+    await revokeUserSessionsService(identityDb, {
       actorSession: superAdminSession,
       targetUserId: created.id,
       clientIp: '10.0.0.70',
       requestId: 'req_usr_rev',
     });
-    const deactivated = await deactivateUserService(db, superAdminSession, created.id, {
+    const deactivated = await deactivateUserService(identityDb, superAdminSession, created.id, {
       clientIp: '10.0.0.70',
       requestId: 'req_usr_deact',
+      workerEnv: testEnv,
     });
     expect(deactivated.isActive).toBe(false);
 
-    const listRes = await listUsersService(db, { page: 1, pageSize: 25, search: '+919811122233' });
+    const listRes = await listUsersService(identityDb, { page: 1, pageSize: 25, search: '+919811122233' });
     expect(listRes.total).toBe(1);
 
-    const auditCount = await db
-      .prepare('SELECT COUNT(*) AS cnt FROM audit_logs WHERE entity_id = ?')
+    const outboxRows = await identityDb
+      .prepare('SELECT action, status FROM audit_outbox WHERE entity_id = ? ORDER BY created_at ASC')
       .bind(created.id)
-      .first();
-    expect(Number(auditCount?.cnt ?? 0)).toBeGreaterThanOrEqual(4);
+      .all();
+    expect((outboxRows.results || []).length).toBeGreaterThanOrEqual(4);
+    expect((outboxRows.results || []).every((r) => r.status === 'PENDING')).toBe(true);
   });
 });

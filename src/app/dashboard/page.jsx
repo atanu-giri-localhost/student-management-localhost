@@ -1,11 +1,14 @@
 'use client';
 
+import Link from 'next/link';
 import { ErrorBanner } from '@/components/data-display/error-banner';
 import { LoadingSkeleton } from '@/components/data-display/loading-skeleton';
 import { StatCard } from '@/components/data-display/stat-card';
 import { PortalShell } from '@/components/layout/portal-shell';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSession } from '@/lib/auth/use-session';
+import { getDashboardPathForRoles } from '@/lib/portals';
 
 export default function AuthenticatedDashboardPage() {
   const { sessionData, loading, errorMsg, handleRetry, handleLogout } = useSession();
@@ -31,6 +34,7 @@ export default function AuthenticatedDashboardPage() {
   }
 
   const primaryRole = sessionData.roles?.[0] || 'STUDENT';
+  const portalDashboardPath = getDashboardPathForRoles(sessionData.roles);
 
   return (
     <PortalShell
@@ -88,6 +92,13 @@ export default function AuthenticatedDashboardPage() {
                 </span>
               </div>
             </div>
+            {portalDashboardPath !== '/dashboard' ? (
+              <div>
+                <Link href={portalDashboardPath} className={buttonVariants({ size: 'sm' })}>
+                  Open {primaryRole.replace(/_/g, ' ')} Portal
+                </Link>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>

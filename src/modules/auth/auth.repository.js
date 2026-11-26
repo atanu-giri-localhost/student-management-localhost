@@ -1,5 +1,5 @@
 /**
- * Direct Cloudflare D1 (`env.DB`) repository for WhatsApp OTP challenges and sessions.
+ * Direct Cloudflare D1 (`DB_IDENTITY`) repository for WhatsApp OTP challenges and sessions.
  */
 
 /**
@@ -201,14 +201,15 @@ export async function consumeOtpAndCreateSessionBatch(db, { challengeId, nowIso,
 }
 
 /**
- * Hydrate an active, unrevoked, unexpired session context with roles and linked profile IDs.
+ * Hydrate an active, unrevoked, unexpired identity session context with roles from `DB_IDENTITY`.
+ * Linked domain profile IDs are hydrated separately via `hydrateUserProfiles`.
  *
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@cloudflare/workers-types').D1Database} identityDb
  * @param {string} tokenHash
  * @param {string} nowIso
  */
-export async function findActiveSessionByTokenHash(db, tokenHash, nowIso) {
-  const row = await db
+export async function findActiveSessionByTokenHash(identityDb, tokenHash, nowIso) {
+  const row = await identityDb
     .prepare(
       `SELECT
          s.id AS session_id,
@@ -217,17 +218,11 @@ export async function findActiveSessionByTokenHash(db, tokenHash, nowIso) {
          u.phone_normalized,
          u.email,
          u.is_active,
-         GROUP_CONCAT(r.name) AS role_names,
-         pp.id AS parent_profile_id,
-         tp.id AS teacher_profile_id,
-         st.id AS student_id
+         GROUP_CONCAT(r.name) AS role_names
        FROM sessions s
        INNER JOIN users u ON u.id = s.user_id
        LEFT JOIN user_roles ur ON ur.user_id = u.id
        LEFT JOIN roles r ON r.id = ur.role_id
-       LEFT JOIN parent_profiles pp ON pp.user_id = u.id
-       LEFT JOIN teacher_profiles tp ON tp.user_id = u.id
-       LEFT JOIN students st ON st.user_id = u.id
        WHERE s.token_hash = ?
          AND s.revoked_at IS NULL
          AND s.expires_at > ?
@@ -254,11 +249,6 @@ export async function findActiveSessionByTokenHash(db, tokenHash, nowIso) {
     email: row.email ?? null,
     isActive: row.is_active === 1,
     roles,
-    profiles: {
-      parentProfileId: row.parent_profile_id ?? null,
-      teacherProfileId: row.teacher_profile_id ?? null,
-      studentId: row.student_id ?? null,
-    },
   };
 }
 

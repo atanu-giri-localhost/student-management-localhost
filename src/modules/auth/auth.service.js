@@ -5,10 +5,11 @@ import {
   hashSessionToken,
   timingSafeEqualHex,
 } from '@/lib/auth/crypto';
+import { hydrateUserProfiles } from '@/lib/auth/profile-hydration';
 import { getSessionSecret, SESSION_MAX_AGE_SECONDS } from '@/lib/auth/session';
 import { addDaysIso, addMinutesIso, isExpiredIso, nowIso } from '@/lib/dates/format';
 import { createWhatsAppProvider, readConfigString } from '@/lib/whatsapp/provider';
-import { createAuditStatement } from '@/modules/audit/audit.service';
+import { createAuditOutboxStatement } from '@/modules/audit/audit.service';
 import {
   consumeOtpAndCreateSessionBatch,
   countRecentOtpRequestsByIp,
@@ -208,14 +209,22 @@ export async function verifyOtpService(
     throw new AuthServiceError('INVALID_OTP', 'Invalid or expired verification code.', 401);
   }
 
-  const sessionContext = await findActiveSessionByTokenHash(db, tokenHash, currentIso);
-  if (!sessionContext) {
+  const identitySession = await findActiveSessionByTokenHash(db, tokenHash, currentIso);
+  if (!identitySession) {
     throw new AuthServiceError('UNAUTHENTICATED', 'Failed to establish active user session.', 401);
   }
 
+  const profiles = await hydrateUserProfiles(workerEnv, {
+    userId: identitySession.userId,
+    roles: identitySession.roles,
+  });
+
   return {
     rawSessionToken,
-    session: sessionContext,
+    session: {
+      ...identitySession,
+      profiles,
+    },
   };
 }
 
@@ -243,11 +252,11 @@ export async function logoutService(db, { sessionId, nowDate = new Date() }) {
  * }} params
  */
 export async function revokeUserSessionsService(
-  db,
+  identityDb,
   { actorSession, targetUserId, clientIp, requestId, nowDate = new Date() }
 ) {
   const currentIso = nowIso(nowDate);
-  const auditStatement = createAuditStatement(db, {
+  const auditStatement = createAuditOutboxStatement(identityDb, {
     actorUserId: actorSession.userId,
     action: 'REVOKE',
     entityType: 'SESSION',
@@ -258,7 +267,7 @@ export async function revokeUserSessionsService(
     createdAt: currentIso,
   });
 
-  const [revokeResult] = await revokeAllSessionsForUserBatch(db, {
+  const [revokeResult] = await revokeAllSessionsForUserBatch(identityDb, {
     targetUserId,
     nowIso: currentIso,
     auditStatement,

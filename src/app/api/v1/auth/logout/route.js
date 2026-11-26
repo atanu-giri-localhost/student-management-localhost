@@ -21,7 +21,7 @@ export async function POST(request) {
   const csrfError = assertSameOrigin(request, { workerEnv: auth.workerEnv, requestId });
   if (csrfError) return csrfError;
 
-  const data = await logoutService(auth.db, { sessionId: auth.session.sessionId });
+  const data = await logoutService(auth.identityDb, { sessionId: auth.session.sessionId });
   const clearCookie = buildClearSessionCookieHeader({
     cookieName: getSessionCookieName(auth.workerEnv),
     secure: shouldUseSecureCookie(auth.workerEnv),

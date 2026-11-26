@@ -1,5 +1,5 @@
 import { getClientIp } from '@/lib/auth/session';
-import { getDb, resolveWorkerEnv } from '@/lib/cloudflare/bindings';
+import { D1_BINDINGS, getDomainDb, resolveWorkerEnv } from '@/lib/cloudflare/bindings';
 import { assertSameOrigin } from '@/lib/http/csrf';
 import { createRequestId, jsonError, jsonOk } from '@/lib/http/response';
 import { parseJsonBody } from '@/lib/validation/common';
@@ -23,10 +23,10 @@ export async function POST(request) {
     const parsed = await parseJsonBody(request, otpRequestSchema, requestId);
     if (!parsed.ok) return parsed.response;
 
-    const db = getDb(workerEnv);
+    const identityDb = getDomainDb(workerEnv, D1_BINDINGS.IDENTITY);
     const clientIp = getClientIp(request);
 
-    const data = await requestOtpService(db, workerEnv, {
+    const data = await requestOtpService(identityDb, workerEnv, {
       phoneNormalized: parsed.data.phone,
       clientIp,
     });

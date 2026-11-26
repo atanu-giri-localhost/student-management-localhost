@@ -30,9 +30,10 @@ export async function POST(request, context) {
   }
 
   try {
-    const user = await deactivateUserService(auth.db, auth.session, parsedId.data, {
+    const user = await deactivateUserService(auth.identityDb, auth.session, parsedId.data, {
       clientIp: getClientIp(request),
       requestId,
+      workerEnv: auth.workerEnv,
     });
     return jsonOk(user, { requestId });
   } catch (error) {

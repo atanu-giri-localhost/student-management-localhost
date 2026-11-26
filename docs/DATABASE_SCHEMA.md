@@ -1,10 +1,11 @@
 # Database Schema & Data Models Specification
 
 **Project:** Student Management System (Coaching Institute + Mess Fee Management)  
-**Database Engine:** Cloudflare D1 (SQLite)  
-**Data Access:** Direct Workers `env.DB` Bindings (`prepare().bind()`, `batch()`) — No ORM  
-**Migrations:** Native Wrangler D1 SQL Migrations (`migrations/*.sql`)  
-**Document Version:** 2.0 (Phase 0 Aligned)  
+**Database Engine:** 8× Cloudflare D1 (SQLite) — `DB_IDENTITY`, `DB_STUDENTS`, `DB_ACADEMICS`, `DB_ATTENDANCE`, `DB_PERFORMANCE`, `DB_FINANCE`, `DB_TIMETABLE`, `DB_AUDIT`  
+**Data Access:** Direct Workers Domain Bindings (`getDomainDb(env, D1_BINDINGS.<DOMAIN>)`: `prepare().bind()`, `batch()`) — No ORM  
+**Migrations:** 8 Independent Native Wrangler D1 SQL Tracks (`migrations/<domain>/*.sql`)  
+**Authoritative Phase A Spec:** [PHASE_A_DATABASE_ARCHITECTURE_PROPOSAL.md](./PHASE_A_DATABASE_ARCHITECTURE_PROPOSAL.md) (45 tables, `ON DELETE RESTRICT` on historical tables, no cross-D1 FKs)  
+**Document Version:** 2.1 (Phase A 8-D1 Aligned)  
 
 ---
 

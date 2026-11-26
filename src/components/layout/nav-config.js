@@ -36,7 +36,6 @@ export const ROLE_PORTAL_NAVIGATION = {
     { label: 'Daily Performance', href: '/teacher/performance' },
     { label: 'Examinations', href: '/teacher/examinations' },
     { label: 'Timetable', href: '/teacher/timetable' },
-    { label: 'Assigned Student Fees', href: '/teacher/assigned-fees' },
   ],
   STUDENT: [
     // Student role MUST NOT have any fee or finance links in MVP.

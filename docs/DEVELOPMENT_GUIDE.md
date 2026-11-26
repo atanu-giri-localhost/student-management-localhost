@@ -32,25 +32,19 @@ cp .dev.vars.example .dev.vars
 ```
 *(In development, `WHATSAPP_PROVIDER="MOCK"` is set by default for local testing without external WhatsApp API calls).*
 
-### Step 3: Initialize Local Cloudflare D1 Database & Run Migrations
-Wrangler emulates Cloudflare D1 locally in `.wrangler/state/v3/d1`:
+### Step 3: Initialize Local 8-D1 Databases, Migrations & Seeds
+Wrangler emulates all 8 Cloudflare D1 databases locally in `.wrangler/state/v3/d1`:
 ```bash
-# Apply versioned SQL migrations (migrations/*.sql) to local D1 SQLite database
-npm run db:migrate:local
+# Apply all 8 migration tracks and seed synthetic fixtures
+npm run db:init:local
 
-# Verify applied migrations and foreign-key enforcement
-npx wrangler d1 migrations list sms-coaching-d1 --local
-npx wrangler d1 execute sms-coaching-d1 --local --command="PRAGMA foreign_keys = ON; SELECT name FROM sqlite_master WHERE type='table';"
+# Verify table counts across all 8 local D1s (45 domain tables total)
+npm run db:verify:local
 ```
 
-*(When adding schema changes later, scaffold a new file with `npm run db:migration:create -- <migration_name>` and author pure SQLite DDL in `migrations/`.)*
+*(To reset local development state cleanly, run `npm run db:reset:local`. Never run destructive resets against remote D1s. Legacy single-D1 files are archived in `docs/archive/single-d1/`.)*
 
-### Step 4: Seed Initial Synthetic Demo Data
-```bash
-npm run db:seed:local
-```
-
-### Step 5: Start the Development Server
+### Step 4: Start the Development Server
 ```bash
 npm run dev
 ```
@@ -60,7 +54,7 @@ npm run dev
 
 ## 3. Demo Credentials (Local Development Mode)
 
-When `WHATSAPP_PROVIDER="MOCK"` is enabled, seeded demo phone numbers (`seeds/seed.sql`) support local development testing:
+When `WHATSAPP_PROVIDER="MOCK"` is enabled, seeded demo phone numbers (`seeds/01_identity.sql`) support local development testing:
 
 | Role | Normalized Phone Number | Initial Landing Portal |
 | :--- | :--- | :--- |
@@ -92,10 +86,12 @@ Before writing domain features (Phase 2+), verify these foundation checks:
 | `npm run dev` | Starts local `vinext dev` server with local bindings. |
 | `npm run build` | Compiles application via `vinext build` into `dist/client` and `dist/server`. |
 | `npm run preview` | Runs Cloudflare Workers local preview via `vite preview` (`@cloudflare/vite-plugin`). |
-| `npm run db:migration:create -- <name>` | Runs `wrangler d1 migrations create sms-coaching-d1 <name>` to create a numbered SQL migration in `migrations/`. |
-| `npm run db:migrate:local` | Applies pending `migrations/*.sql` files to local D1 via `wrangler d1 migrations apply sms-coaching-d1 --local`. |
-| `npm run db:migrate:prod` | Applies reviewed pending migrations to production D1 via `wrangler d1 migrations apply sms-coaching-d1 --remote`. |
-| `npm run db:seed:local` | Executes synthetic `seeds/seed.sql` against local D1 via `wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql`. |
+| `npm run db:migrate:local` | Applies pending `migrations/<domain>/*.sql` files across all 8 local D1s (`--local --force`). |
+| `npm run db:migrate:prod` | Applies reviewed pending migrations to remote D1s (requires `CONFIRM_REMOTE_D1_MIGRATE=true`). |
+| `npm run db:seed:local` | Executes synthetic `seeds/01_identity.sql`..`08_audit.sql` against all 8 local D1s. |
+| `npm run db:init:local` | Runs `db:migrate:local` followed by `db:seed:local`. |
+| `npm run db:verify:local` | Verifies domain table counts across all 8 local D1s (45 tables total). |
+| `npm run db:reset:local` | Wipes local `.wrangler/state/v3/d1` only and re-runs `db:init:local`. |
 | `npm test` | Runs unit and integration test suite via `vitest run`. |
 | `npm run lint` | Runs ESLint (`eslint .`) including React, Hooks, and JSX accessibility (`jsx-a11y`) checks. |
 

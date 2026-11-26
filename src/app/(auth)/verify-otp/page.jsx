@@ -9,6 +9,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeftIcon, LockIcon, PortalIcon } from '@/components/ui/icons';
 import { ToastBanner } from '@/components/ui/toast';
+import { resetClientSessionCache } from '@/lib/auth/use-session';
 import { getPortalByKey } from '@/lib/portals';
 import { cn } from '@/lib/utils';
 
@@ -102,6 +103,7 @@ function VerifyOtpContent() {
         return;
       }
 
+      resetClientSessionCache();
       router.push('/dashboard');
     } catch {
       setErrorMsg('Network error while verifying OTP.');

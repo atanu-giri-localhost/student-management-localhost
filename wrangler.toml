@@ -11,13 +11,57 @@ not_found_handling = "none"
 run_worker_first = ["/*", "!/_next/static/*", "!/*/_next/static/*"]
 
 # ==========================================
-# CLOUDFLARE D1 DATABASE (SQLite)
+# CLOUDFLARE D1 DATABASES (8 Domain SQLite DBs)
+# Placeholder database_ids are for local dev only.
+# Replace with real Cloudflare D1 IDs before remote deploy.
 # ==========================================
 [[d1_databases]]
-binding = "DB"
-database_name = "sms-coaching-d1"
-database_id = "00000000-0000-0000-0000-000000000000"
-migrations_dir = "migrations"
+binding = "DB_IDENTITY"
+database_name = "sms-d1-identity"
+database_id = "00000000-0000-0000-0000-000000000001"
+migrations_dir = "migrations/identity"
+
+[[d1_databases]]
+binding = "DB_STUDENTS"
+database_name = "sms-d1-students"
+database_id = "00000000-0000-0000-0000-000000000002"
+migrations_dir = "migrations/students"
+
+[[d1_databases]]
+binding = "DB_ACADEMICS"
+database_name = "sms-d1-academics"
+database_id = "00000000-0000-0000-0000-000000000003"
+migrations_dir = "migrations/academics"
+
+[[d1_databases]]
+binding = "DB_ATTENDANCE"
+database_name = "sms-d1-attendance"
+database_id = "00000000-0000-0000-0000-000000000004"
+migrations_dir = "migrations/attendance"
+
+[[d1_databases]]
+binding = "DB_PERFORMANCE"
+database_name = "sms-d1-performance"
+database_id = "00000000-0000-0000-0000-000000000005"
+migrations_dir = "migrations/performance"
+
+[[d1_databases]]
+binding = "DB_FINANCE"
+database_name = "sms-d1-finance"
+database_id = "00000000-0000-0000-0000-000000000006"
+migrations_dir = "migrations/finance"
+
+[[d1_databases]]
+binding = "DB_TIMETABLE"
+database_name = "sms-d1-timetable"
+database_id = "00000000-0000-0000-0000-000000000007"
+migrations_dir = "migrations/timetable"
+
+[[d1_databases]]
+binding = "DB_AUDIT"
+database_name = "sms-d1-audit"
+database_id = "00000000-0000-0000-0000-000000000008"
+migrations_dir = "migrations/audit"
 
 # ==========================================
 # CLOUDFLARE R2 OBJECT STORAGE

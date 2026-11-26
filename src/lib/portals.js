@@ -77,7 +77,7 @@ export const PORTALS = [
   },
 ];
 
-const PORTALS_BY_KEY = Object.fromEntries(PORTALS.map((portal) => [portal.key]));
+const PORTALS_BY_KEY = Object.fromEntries(PORTALS.map((portal) => [portal.key, portal]));
 
 /**
  * Look up a portal by its URL key.
@@ -90,4 +90,41 @@ export function getPortalByKey(key) {
     return null;
   }
   return PORTALS_BY_KEY[key] ?? null;
+}
+
+const ROLE_DASHBOARD_PATHS = {
+  SUPER_ADMIN: '/admin/dashboard',
+  COACHING_ADMIN: '/admin/dashboard',
+  TEACHER: '/teacher/dashboard',
+  STUDENT: '/student/dashboard',
+  PARENT: '/parent/dashboard',
+};
+
+/**
+ * Resolve the primary portal dashboard path for a list of user roles.
+ *
+ * @param {string[] | undefined} roles
+ * @returns {string}
+ */
+export function getDashboardPathForRoles(roles) {
+  if (Array.isArray(roles)) {
+    for (const role of roles) {
+      if (ROLE_DASHBOARD_PATHS[role]) {
+        return ROLE_DASHBOARD_PATHS[role];
+      }
+    }
+  }
+  return '/dashboard';
+}
+
+/**
+ * Check whether a hydrated session carries at least one of the allowed roles.
+ *
+ * @param {{ roles?: string[] } | null | undefined} sessionData
+ * @param {string[]} allowedRoles
+ * @returns {boolean}
+ */
+export function hasAnyRole(sessionData, allowedRoles) {
+  const roles = Array.isArray(sessionData?.roles) ? sessionData.roles : [];
+  return allowedRoles.some((role) => roles.includes(role));
 }

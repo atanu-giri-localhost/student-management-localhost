@@ -1,5 +1,5 @@
 /**
- * Direct Cloudflare D1 (`env.DB`) repository for `users`, `roles`, and `user_roles`.
+ * Direct Cloudflare D1 (`DB_IDENTITY`) repository for `users`, `roles`, and `user_roles`.
  */
 
 function mapUserRow(row) {
@@ -81,13 +81,14 @@ export async function listUsersPaginated(db, filters) {
 }
 
 /**
- * Find one user by ID with roles and linked profile IDs.
+ * Find one user by ID with roles from `DB_IDENTITY`.
+ * Linked profile IDs are hydrated separately via `hydrateUserProfiles`.
  *
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@cloudflare/workers-types').D1Database} identityDb
  * @param {string} userId
  */
-export async function findUserDetailById(db, userId) {
-  const row = await db
+export async function findUserDetailById(identityDb, userId) {
+  const row = await identityDb
     .prepare(
       `SELECT
          u.id,
@@ -96,16 +97,10 @@ export async function findUserDetailById(db, userId) {
          u.is_active,
          u.created_at,
          u.updated_at,
-         GROUP_CONCAT(r.name) AS role_names,
-         pp.id AS parent_profile_id,
-         tp.id AS teacher_profile_id,
-         st.id AS student_id
+         GROUP_CONCAT(r.name) AS role_names
        FROM users u
        LEFT JOIN user_roles ur ON ur.user_id = u.id
        LEFT JOIN roles r ON r.id = ur.role_id
-       LEFT JOIN parent_profiles pp ON pp.user_id = u.id
-       LEFT JOIN teacher_profiles tp ON tp.user_id = u.id
-       LEFT JOIN students st ON st.user_id = u.id
        WHERE u.id = ?
        GROUP BY u.id`
     )
@@ -116,14 +111,7 @@ export async function findUserDetailById(db, userId) {
     return null;
   }
 
-  return {
-    ...mapUserRow(row),
-    profiles: {
-      parentProfileId: row.parent_profile_id ?? null,
-      teacherProfileId: row.teacher_profile_id ?? null,
-      studentId: row.student_id ?? null,
-    },
-  };
+  return mapUserRow(row);
 }
 
 /**

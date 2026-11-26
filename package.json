@@ -9,10 +9,12 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest run",
-    "db:migration:create": "wrangler d1 migrations create sms-coaching-d1",
-    "db:migrate:local": "wrangler d1 migrations apply sms-coaching-d1 --local",
-    "db:migrate:prod": "wrangler d1 migrations apply sms-coaching-d1 --remote",
-    "db:seed:local": "wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql"
+    "db:migrate:local": "for db in sms-d1-identity sms-d1-students sms-d1-academics sms-d1-attendance sms-d1-performance sms-d1-finance sms-d1-timetable sms-d1-audit; do npx wrangler d1 migrations apply \"$db\" --local --force || exit 1; done",
+    "db:migrate:prod": "test \"$CONFIRM_REMOTE_D1_MIGRATE\" = \"true\" || { echo 'Refusing remote migration without CONFIRM_REMOTE_D1_MIGRATE=true'; exit 1; }; for db in sms-d1-identity sms-d1-students sms-d1-academics sms-d1-attendance sms-d1-performance sms-d1-finance sms-d1-timetable sms-d1-audit; do npx wrangler d1 migrations apply \"$db\" --remote || exit 1; done",
+    "db:seed:local": "npx wrangler d1 execute sms-d1-identity --local --file=./seeds/01_identity.sql && npx wrangler d1 execute sms-d1-students --local --file=./seeds/02_students.sql && npx wrangler d1 execute sms-d1-academics --local --file=./seeds/03_academics.sql && npx wrangler d1 execute sms-d1-attendance --local --file=./seeds/04_attendance.sql && npx wrangler d1 execute sms-d1-performance --local --file=./seeds/05_performance.sql && npx wrangler d1 execute sms-d1-finance --local --file=./seeds/06_finance.sql && npx wrangler d1 execute sms-d1-timetable --local --file=./seeds/07_timetable.sql && npx wrangler d1 execute sms-d1-audit --local --file=./seeds/08_audit.sql",
+    "db:init:local": "npm run db:migrate:local && npm run db:seed:local",
+    "db:verify:local": "for db in sms-d1-identity sms-d1-students sms-d1-academics sms-d1-attendance sms-d1-performance sms-d1-finance sms-d1-timetable sms-d1-audit; do echo \"=== $db ===\"; npx wrangler d1 execute \"$db\" --local --command=\"SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('_cf_KV', 'd1_migrations');\" || exit 1; done",
+    "db:reset:local": "rm -rf .wrangler/state/v3/d1 && npm run db:init:local"
   },
   "dependencies": {
     "react": "^19.3.1",

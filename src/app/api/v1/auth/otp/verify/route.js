@@ -4,7 +4,7 @@ import {
   getSessionCookieName,
   shouldUseSecureCookie,
 } from '@/lib/auth/session';
-import { getDb, resolveWorkerEnv } from '@/lib/cloudflare/bindings';
+import { D1_BINDINGS, getDomainDb, resolveWorkerEnv } from '@/lib/cloudflare/bindings';
 import { assertSameOrigin } from '@/lib/http/csrf';
 import { createRequestId, jsonError, jsonOk } from '@/lib/http/response';
 import { parseJsonBody } from '@/lib/validation/common';
@@ -27,11 +27,11 @@ export async function POST(request) {
     const parsed = await parseJsonBody(request, otpVerifySchema, requestId);
     if (!parsed.ok) return parsed.response;
 
-    const db = getDb(workerEnv);
+    const identityDb = getDomainDb(workerEnv, D1_BINDINGS.IDENTITY);
     const clientIp = getClientIp(request);
     const userAgent = request.headers.get('user-agent')?.slice(0, 255) ?? null;
 
-    const { rawSessionToken, session } = await verifyOtpService(db, workerEnv, {
+    const { rawSessionToken, session } = await verifyOtpService(identityDb, workerEnv, {
       phoneNormalized: parsed.data.phone,
       otp: parsed.data.otp,
       userAgent,

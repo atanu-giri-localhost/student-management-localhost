@@ -26,7 +26,7 @@ export async function POST(request) {
   const parsed = await parseJsonBody(request, sessionRevokeSchema, requestId);
   if (!parsed.ok) return parsed.response;
 
-  const data = await revokeUserSessionsService(auth.db, {
+  const data = await revokeUserSessionsService(auth.identityDb, {
     actorSession: auth.session,
     targetUserId: parsed.data.userId,
     clientIp: getClientIp(request),

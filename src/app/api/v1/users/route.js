@@ -37,7 +37,7 @@ export async function GET(request) {
     });
   }
 
-  const { users, total } = await listUsersService(auth.db, parsed.data);
+  const { users, total } = await listUsersService(auth.identityDb, parsed.data);
   return jsonPaginated(
     users,
     { page: parsed.data.page, pageSize: parsed.data.pageSize, total },
@@ -65,9 +65,10 @@ export async function POST(request) {
   if (!parsed.ok) return parsed.response;
 
   try {
-    const user = await createUserService(auth.db, auth.session, parsed.data, {
+    const user = await createUserService(auth.identityDb, auth.session, parsed.data, {
       clientIp: getClientIp(request),
       requestId,
+      workerEnv: auth.workerEnv,
     });
     return jsonOk(user, { status: 201, requestId });
   } catch (error) {

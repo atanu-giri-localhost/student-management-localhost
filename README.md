@@ -28,8 +28,8 @@ The application delivers tailored, role-specific portals with strict, server-sid
 * **Framework:** Next.js App Router (Full-Stack Modular Monolith).
 * **Language:** **JavaScript / JSX (`.js`, `.jsx`)** across application code (Zod for runtime validation, JSDoc for typing).
 * **Edge Runtime:** Cloudflare Workers (deployed via **vinext** baseline; OpenNext documented fallback).
-* **Database:** **Cloudflare D1 (SQLite)** accessed directly via request-scoped Workers bindings (`env.DB.prepare().bind()` and atomic `env.DB.batch([...])` — **no ORM**).
-* **Migrations:** **Native Wrangler D1 SQL migrations** (`migrations/*.sql`, tracked in `d1_migrations`).
+* **Database:** **8× Cloudflare D1 (SQLite)** domain databases (`DB_IDENTITY`, `DB_STUDENTS`, `DB_ACADEMICS`, `DB_ATTENDANCE`, `DB_PERFORMANCE`, `DB_FINANCE`, `DB_TIMETABLE`, `DB_AUDIT`) accessed directly via request-scoped Workers bindings (`db.prepare().bind()` and atomic `db.batch([...])` — **no ORM**).
+* **Migrations:** **Native Wrangler D1 SQL migrations** (`migrations/<domain>/*.sql`, tracked in per-DB `d1_migrations`). Legacy single-D1 files are archived in `docs/archive/single-d1/`.
 * **File Storage:** **Cloudflare R2** for student/staff photographs and documents.
 * **Financial Storage:** **Integer Paise (`amount_paise INTEGER`)** for all INR monetary calculations.
 * **Authentication:** **WhatsApp OTP** with provider abstraction, hashed OTP verification, and secure `HttpOnly` session cookies.
@@ -46,7 +46,7 @@ All architectural blueprints, database schemas, and guides in `docs/` are aligne
 | **Development Roadmap** | Ultimate Phase 0 through Phase 10 execution plan: file paths, `npm`/`wrangler` commands, OPEN gates, and exit criteria. | [docs/DEVELOPMENT_ROADMAP.md](./docs/DEVELOPMENT_ROADMAP.md) |
 | **System Architecture** | Modular Monolith layout, Cloudflare Workers execution model, request-scoped D1 bindings, R2 storage, and security layers. | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 | **Database Schema** | Cloudflare D1 (SQLite) relational schema, ER diagram, integer paise rules, session-based enrollments, and SQLite DDL / D1 patterns. | [docs/DATABASE_SCHEMA.md](./docs/DATABASE_SCHEMA.md) |
-| **SQL DDL Blueprint** | Physical 36-table SQLite DDL reference, 50 explicit indexes, `EXPLAIN QUERY PLAN` patterns, and synthetic seed reference. | [docs/SQL_DDL_BLUEPRINT.md](./docs/SQL_DDL_BLUEPRINT.md) |
+| **SQL DDL Blueprint** | Physical 45-table 8-D1 SQLite DDL reference (`PHASE_A_DATABASE_ARCHITECTURE_PROPOSAL.md`), indexes, and synthetic seed reference. | [docs/SQL_DDL_BLUEPRINT.md](./docs/SQL_DDL_BLUEPRINT.md) |
 | **Security & RBAC Spec** | Request pipeline, CSRF/Origin checks, Web Crypto WhatsApp OTP state machine, exact SQL isolation predicates, R2 & `audit_logs`. | [docs/SECURITY_AND_RBAC_SPEC.md](./docs/SECURITY_AND_RBAC_SPEC.md) |
 | **RESTful API Spec** | Next.js App Router Route Handlers (`/api/v1/*`), WhatsApp OTP lifecycle, integer paise payloads, and response envelopes. | [docs/API_SPECIFICATION.md](./docs/API_SPECIFICATION.md) |
 | **Business Rules & Logic** | Domain logic: fee invoicing, payment allocations, dual attendance registers, teacher scoping, and list of 15 OPEN decisions. | [docs/BUSINESS_RULES_AND_LOGIC.md](./docs/BUSINESS_RULES_AND_LOGIC.md) |

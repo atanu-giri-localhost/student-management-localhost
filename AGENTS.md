@@ -9,8 +9,8 @@ Build a secure, maintainable Student Management System (SMS) for one coaching in
 - Next.js App Router
 - JavaScript / JSX (`.js` and `.jsx` only; not TypeScript for application code)
 - Cloudflare Workers deployment (`vinext` baseline; `OpenNext` as evaluated fallback if a required feature is incompatible)
-- Cloudflare D1 (SQLite) accessed directly via request-scoped Workers `env.DB` bindings (`env.DB.prepare(...).bind(...).all()/first()/run()` and `env.DB.batch([...])`)
-- Native Wrangler D1 SQL migrations (`migrations/*.sql`, `wrangler d1 migrations apply`)
+- Cloudflare D1 (SQLite) — **8-D1 modular architecture** (`DB_IDENTITY`, `DB_STUDENTS`, `DB_ACADEMICS`, `DB_ATTENDANCE`, `DB_PERFORMANCE`, `DB_FINANCE`, `DB_TIMETABLE`, `DB_AUDIT`) accessed directly via request-scoped Workers bindings (`db.prepare(...).bind(...).all()/first()/run()` and `db.batch([...])`, where `db = getDomainDb(env, D1_BINDINGS.<DOMAIN>)`)
+- Native Wrangler D1 SQL migrations (`migrations/<domain>/*.sql`, `wrangler d1 migrations apply <db-name>`)
 - Cloudflare R2 (private object storage via `env.STORAGE`; metadata in D1 `file_objects`)
 - Tailwind CSS + shadcn/ui
 - Zod (external input validation) + React Hook Form
@@ -54,9 +54,11 @@ Use project and platform skills when working on implementation or verification:
 - Use a **modular monolith** (`src/modules/*` with `*.service.js`, `*.repository.js`, `*.schemas.js`, `*.permissions.js`).
 - Keep UI components separate from business logic.
 - Route Handlers (`src/app/api/v1/*`) must validate input (Zod), authenticate, authorize, call domain services, and shape responses; do not put complex business logic in route files.
-- Put domain logic in module services and keep SQL queries behind module repositories (`*.repository.js`) using request-scoped `env.DB`.
+- Put domain logic in module services and keep SQL queries behind module repositories (`*.repository.js`) using request-scoped domain D1 bindings (`env.DB_<DOMAIN>`).
 - Avoid circular module dependencies and direct cross-module table manipulation from UI code.
-- Use request-scoped Cloudflare bindings (`env.DB`, `env.STORAGE`); never capture request-specific D1 or R2 bindings in global singletons.
+- Use request-scoped Cloudflare bindings (`env.DB_*`, `env.STORAGE`); never capture request-specific D1 or R2 bindings in global singletons.
+- Cross-D1 references are soft UUIDs without SQL `REFERENCES`; validate cross-D1 references in services before writing, and use bounded `IN (...)` (`<= 100` bind params) for hydration.
+- Critical mutations in `DB_IDENTITY`, `DB_STUDENTS`, `DB_ATTENDANCE`, and `DB_FINANCE` write to domain-local `audit_outbox` atomically inside the same `batch()` (reconciled to `DB_AUDIT.audit_logs` via `INSERT OR IGNORE` in Phase B+); routine events remain best-effort.
 - Use only APIs supported by the selected Workers runtime and deployment adapter; do not assume Node.js APIs are available without `nodejs_compat` and spike verification.
 
 ## Database rules
@@ -65,14 +67,14 @@ Use project and platform skills when working on implementation or verification:
 - Do not use any ORM or query-builder abstraction (no Drizzle, Prisma, TypeORM, Kysely). Use `env.DB.prepare(sql).bind(...).all() / .first() / .run()` and `env.DB.batch([...])` directly.
 - Always use parameterized prepared statements (`?` placeholders with `.bind(...)`); never interpolate values or unvalidated identifiers into SQL strings.
 - Store SQLite booleans as `INTEGER` (`0` or `1`) and bind `1`/`0` explicitly (not raw JS `true`/`false`).
-- Author reviewed SQL migrations in `migrations/*.sql` (with `migrations_dir = "migrations"` in `wrangler.toml`) and apply via `wrangler d1 migrations apply`. Keep synthetic seed SQL outside `migrations/`.
+- Author reviewed SQL migrations in `migrations/<domain>/*.sql` (with `migrations_dir = "migrations/<domain>"` in `wrangler.toml`) and apply via `npm run db:migrate:local` / `wrangler d1 migrations apply <db-name>`. Keep synthetic seed SQL (`seeds/01_*.sql`..`08_*.sql`) outside `migrations/` (legacy single-D1 files are archived in `docs/archive/single-d1/`).
 - Never use destructive schema pushes against production; keep deployed migrations immutable and fix mistakes with follow-up migrations.
-- Enable and verify foreign-key enforcement (`PRAGMA foreign_keys = ON;`) in local and production D1 setups.
-- Preserve historical `enrollments`, `attendance_days`/`daily_attendance_records`, `period_attendance_registers`/`period_attendance_records`, `exam_marks`, `invoices`, `invoice_items`, `payments`, `payment_allocations`, and `receipts`. Do not cascade-delete historical academic or financial records.
-- Use integer paise (`INTEGER NOT NULL`, `amount_paise` / `amountPaise`) for all INR monetary amounts; floating-point money arithmetic is forbidden.
-- Use database constraints for uniqueness and referential integrity where practical (e.g., `admission_number`, `invoice_number`, `receipt_number`, `(student_id, academic_session_id)`).
-- Never store uploaded binary files in D1; store objects in private Cloudflare R2 and metadata in D1 `file_objects`.
-- For multi-statement finance writes (invoice + items; payment + allocations + receipt + status update; reversals + audit), use atomic `env.DB.batch([...])` and test rollback.
+- Enable and verify foreign-key enforcement (`PRAGMA foreign_keys = ON;`) in local and production D1 setups for intra-DB FKs.
+- Preserve historical `enrollments`, `attendance_days`/`daily_attendance_records`, `period_attendance_registers`/`period_attendance_records`, `exam_marks`, `invoices`, `invoice_items`, `payments`, `payment_allocations`, `fee_adjustments`, `payment_reversals`, and `receipts`. Do not cascade-delete historical academic or financial records.
+- Use integer paise (`INTEGER NOT NULL`, `amount_paise` / `amountPaise`) for all INR monetary amounts; floating-point money arithmetic is forbidden. `fee_adjustments` uses explicit signed `amount_paise` (`WAIVER`/`DISCOUNT` < 0, `LATE_FINE` > 0, `CORRECTION` != 0) and is invoice-scoped in MVP; `payment_reversals` supports full-only reversals (`1:1`), preserving allocations and voiding receipts (`receipts.status = 'VOIDED'`), and all paid-balance queries must filter `payments.status = 'POSTED'`.
+- Use database constraints for uniqueness and referential integrity within each D1 where practical (e.g., `admission_number`, `invoice_number`, `receipt_number`, `(student_id, academic_session_id)`).
+- Never store uploaded binary files in D1; store objects in private Cloudflare R2 and metadata in `DB_STUDENTS.file_objects`.
+- For multi-statement finance writes (invoice + items; payment + allocations + receipt + status update; adjustments; reversals + outbox), use atomic `DB_FINANCE.batch([...])` and test rollback.
 
 ## Security rules
 

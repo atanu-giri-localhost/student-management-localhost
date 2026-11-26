@@ -1,51 +1,17 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { EmptyState } from '@/components/data-display/empty-state';
 import { ErrorBanner } from '@/components/data-display/error-banner';
 import { LoadingSkeleton } from '@/components/data-display/loading-skeleton';
-import { SectionHeader } from '@/components/layout/SectionHeader';
 import { StatCard } from '@/components/data-display/stat-card';
 import { PortalShell } from '@/components/layout/portal-shell';
+import { SectionHeader } from '@/components/layout/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSession } from '@/lib/auth/use-session';
-import { cn } from '@/lib/utils';
-
-const ATTENDANCE_STATS = [
-  { label: 'Present', count: 42, pct: 84, color: 'bg-emerald-500 dark:bg-emerald-700' },
-  { label: 'Absent', count: 5, pct: 10, color: 'bg-rose-500 dark:bg-rose-700' },
-  { label: 'Late', count: 3, pct: 6, color: 'bg-amber-500 dark:bg-amber-700' },
-];
-
-const MONTHLY_ATTENDANCE = [
-  { date: '2026-11-18', day: 'Monday', status: 'PRESENT', checkIn: '08:55', checkOut: '16:00', subject: 'All' },
-  { date: '2026-11-19', day: 'Tuesday', status: 'PRESENT', checkIn: '08:50', checkOut: '16:05', subject: 'All' },
-  { date: '2026-11-20', day: 'Wednesday', status: 'PRESENT', checkIn: '09:00', checkOut: '16:00', subject: 'All' },
-  { date: '2026-11-21', day: 'Thursday', status: 'PRESENT', checkIn: '08:55', checkOut: '16:10', subject: 'All' },
-  { date: '2026-11-22', day: 'Friday', status: 'PRESENT', checkIn: '08:45', checkOut: '16:00', subject: 'All' },
-  { date: '2026-11-23', day: 'Saturday', status: 'ABSENT', checkIn: '—', checkOut: '—', subject: 'All' },
-  { date: '2026-11-24', day: 'Monday', status: 'ABSENT', checkIn: '—', checkOut: '—', subject: 'All' },
-  { date: '2026-11-25', day: 'Tuesday', status: 'PRESENT', checkIn: '08:55', checkOut: '16:00', subject: 'All' },
-  { date: '2026-11-26', day: 'Wednesday', status: 'LATE', checkIn: '09:10', checkOut: '—', subject: 'All' },
-];
-
-const PERIOD_ATTENDANCE = [
-  { period: 1, subject: 'Mathematics', status: 'PRESENT' },
-  { period: 2, subject: 'Physics', status: 'PRESENT' },
-  { period: 3, subject: 'Chemistry', status: 'ABSENT' },
-  { period: 4, subject: 'Biology', status: 'PRESENT' },
-  { period: 5, subject: 'English', status: 'PRESENT' },
-  { period: 6, subject: 'Mathematics', status: 'PRESENT' },
-  { period: 7, subject: 'Physics', status: 'PRESENT' },
-  { period: 8, subject: 'Chemistry', status: 'LATE' },
-];
-
-const SUBJECT_ATTENDANCE = [
-  { subject: 'Mathematics', attended: 28, total: 30, pct: 93 },
-  { subject: 'Physics', attended: 26, total: 30, pct: 87 },
-  { subject: 'Chemistry', attended: 24, total: 30, pct: 80 },
-  { subject: 'Biology', attended: 29, total: 30, pct: 97 },
-  { subject: 'English', attended: 25, total: 30, pct: 83 },
-];
+import { apiFetch } from '@/lib/http/api-client';
+import { hasAnyRole } from '@/lib/portals';
 
 function statusBadgeVariant(status) {
   if (status === 'PRESENT') return 'success';
@@ -56,6 +22,39 @@ function statusBadgeVariant(status) {
 
 export default function StudentAttendancePage() {
   const { sessionData, loading, errorMsg, handleRetry, handleLogout } = useSession();
+  const [records, setRecords] = useState([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataError, setDataError] = useState('');
+
+  const isAuthorized = hasAnyRole(sessionData, ['STUDENT', 'SUPER_ADMIN', 'COACHING_ADMIN']);
+  const studentId = sessionData?.profiles?.studentId || null;
+
+  useEffect(() => {
+    if (!sessionData || !isAuthorized || !studentId) return;
+
+    let cancelled = false;
+    async function loadAttendance() {
+      setDataLoading(true);
+      setDataError('');
+      try {
+        const res = await apiFetch(`/api/v1/attendance/students/${studentId}?page=1&pageSize=25`);
+        if (!cancelled) {
+          setRecords(Array.isArray(res?.data) ? res.data : []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setDataError(err?.message || 'Unable to load attendance history.');
+        }
+      } finally {
+        if (!cancelled) setDataLoading(false);
+      }
+    }
+
+    loadAttendance();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionData, isAuthorized, studentId]);
 
   if (loading) {
     return (
@@ -79,11 +78,32 @@ export default function StudentAttendancePage() {
 
   const primaryRole = sessionData.roles?.[0] || 'STUDENT';
 
+  if (!isAuthorized) {
+    return (
+      <PortalShell
+        roleName={primaryRole}
+        roleLabel={primaryRole.replace(/_/g, ' ')}
+        pageTitle="Attendance"
+        activePath="/student/attendance"
+        userLabel={sessionData.user.phoneNormalized}
+        onLogout={handleLogout}
+      >
+        <ErrorBanner
+          title="Access restricted"
+          message="Student privileges are required to view this page."
+        />
+      </PortalShell>
+    );
+  }
+
+  const presentCount = records.filter((r) => r.status === 'PRESENT').length;
+  const absentCount = records.filter((r) => r.status === 'ABSENT').length;
+
   return (
     <PortalShell
       roleName={primaryRole}
       roleLabel="Student"
-      pageTitle="Student Attendance"
+      pageTitle="Attendance"
       activePath="/student/attendance"
       userLabel={sessionData.user.phoneNormalized}
       onLogout={handleLogout}
@@ -91,137 +111,62 @@ export default function StudentAttendancePage() {
       <div className="space-y-6">
         <SectionHeader
           title="Attendance"
-          description="Track your daily and subject-wise attendance."
+          description="Daily and period attendance records from DB_ATTENDANCE."
         />
 
-        {/* Quick Stats */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Overall" value="84%" subtitle="42 of 50 days" />
-          <StatCard title="Present" value="42" subtitle="Days this month" />
-          <StatCard title="Absent" value="5" subtitle="Days this month" />
-          <StatCard title="Late" value="3" subtitle="Days this month" />
-        </div>
+        {dataError ? <ErrorBanner title="Attendance unavailable" message={dataError} /> : null}
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Attendance Breakdown Bar */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Attendance Breakdown</CardTitle>
-              <CardDescription>Percentage split this month.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {ATTENDANCE_STATS.map((item) => (
-                <div key={item.label} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">{item.label}</span>
-                    <span className="font-bold text-slate-900 dark:text-slate-100">{item.pct}%</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div
-                      className={cn('h-full rounded-full transition-all', item.color)}
-                      style={{ width: `${item.pct}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Subject-wise Attendance */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Subject-wise Attendance</CardTitle>
-              <CardDescription>Attendance rate per subject.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {SUBJECT_ATTENDANCE.map((item) => (
-                <div key={item.subject} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">{item.subject}</span>
-                    <span className="font-bold text-slate-900 dark:text-slate-100">{item.pct}%</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div
-                      className="h-full rounded-full bg-blue-500 dark:bg-blue-700 transition-all"
-                      style={{ width: `${item.pct}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
-                    {item.attended}/{item.total} classes
-                  </p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Daily Attendance Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Daily Attendance</CardTitle>
-            <CardDescription>Recent daily check-in and check-out records.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-full border-collapse text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Day</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Check-in</th>
-                    <th className="px-4 py-3">Check-out</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {MONTHLY_ATTENDANCE.map((row) => (
-                    <tr key={row.date} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.date}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.day}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.checkIn}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.checkOut}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {!studentId ? (
+          <EmptyState
+            title="No student profile linked"
+            description="An active student profile is required to view attendance records."
+          />
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <StatCard title="Total Entries" value={dataLoading ? '...' : String(records.length)} />
+              <StatCard title="Present" value={dataLoading ? '...' : String(presentCount)} />
+              <StatCard title="Absent" value={dataLoading ? '...' : String(absentCount)} />
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Today&apos;s Period Attendance */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Today&apos;s Period Attendance</CardTitle>
-            <CardDescription>Period-by-period attendance for today.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-full border-collapse text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3">Period</th>
-                    <th className="px-4 py-3">Subject</th>
-                    <th className="px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {PERIOD_ATTENDANCE.map((row) => (
-                    <tr key={row.period} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">P{row.period}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{row.subject}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Attendance Log</CardTitle>
+                <CardDescription>Loaded from GET /api/v1/attendance/students/{studentId}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {dataLoading ? (
+                  <LoadingSkeleton rows={4} />
+                ) : records.length === 0 ? (
+                  <EmptyState
+                    title="No attendance records"
+                    description="No attendance entries have been recorded yet."
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {records.map((rec) => (
+                      <div
+                        key={rec.id || `${rec.attendanceDate}-${rec.registerType}`}
+                        className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800"
+                      >
+                        <div>
+                          <p className="font-medium text-slate-900 dark:text-slate-100">
+                            {rec.attendanceDate || rec.date || 'Date'}
+                          </p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {rec.registerType || 'DAILY'}
+                            {rec.periodNumber ? ` • Period ${rec.periodNumber}` : ''}
+                          </p>
+                        </div>
+                        <Badge variant={statusBadgeVariant(rec.status)}>{rec.status}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </PortalShell>
   );

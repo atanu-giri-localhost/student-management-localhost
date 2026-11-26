@@ -27,7 +27,7 @@ export async function GET(request, context) {
   }
 
   try {
-    const user = await getUserByIdService(auth.db, parsedId.data);
+    const user = await getUserByIdService(auth.identityDb, parsedId.data, auth.workerEnv);
     return jsonOk(user, { requestId });
   } catch (error) {
     if (error instanceof UsersServiceError) {
@@ -64,9 +64,10 @@ export async function PATCH(request, context) {
   if (!parsedBody.ok) return parsedBody.response;
 
   try {
-    const updated = await updateUserService(auth.db, auth.session, parsedId.data, parsedBody.data, {
+    const updated = await updateUserService(auth.identityDb, auth.session, parsedId.data, parsedBody.data, {
       clientIp: getClientIp(request),
       requestId,
+      workerEnv: auth.workerEnv,
     });
     return jsonOk(updated, { requestId });
   } catch (error) {

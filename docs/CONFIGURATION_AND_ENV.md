@@ -24,13 +24,55 @@ not_found_handling = "none"
 run_worker_first = ["/*", "!/_next/static/*", "!/*/_next/static/*"]
 
 # ==========================================
-# CLOUDFLARE D1 DATABASE (SQLite)
+# CLOUDFLARE D1 DATABASES (8 Domain SQLite DBs)
 # ==========================================
 [[d1_databases]]
-binding = "DB"
-database_name = "sms-coaching-d1"
-database_id = "00000000-0000-0000-0000-000000000000" # Replace with remote D1 ID
-migrations_dir = "migrations" # Native Wrangler D1 SQL migrations tracked in d1_migrations
+binding = "DB_IDENTITY"
+database_name = "sms-d1-identity"
+database_id = "00000000-0000-0000-0000-000000000001"
+migrations_dir = "migrations/identity"
+
+[[d1_databases]]
+binding = "DB_STUDENTS"
+database_name = "sms-d1-students"
+database_id = "00000000-0000-0000-0000-000000000002"
+migrations_dir = "migrations/students"
+
+[[d1_databases]]
+binding = "DB_ACADEMICS"
+database_name = "sms-d1-academics"
+database_id = "00000000-0000-0000-0000-000000000003"
+migrations_dir = "migrations/academics"
+
+[[d1_databases]]
+binding = "DB_ATTENDANCE"
+database_name = "sms-d1-attendance"
+database_id = "00000000-0000-0000-0000-000000000004"
+migrations_dir = "migrations/attendance"
+
+[[d1_databases]]
+binding = "DB_PERFORMANCE"
+database_name = "sms-d1-performance"
+database_id = "00000000-0000-0000-0000-000000000005"
+migrations_dir = "migrations/performance"
+
+[[d1_databases]]
+binding = "DB_FINANCE"
+database_name = "sms-d1-finance"
+database_id = "00000000-0000-0000-0000-000000000006"
+migrations_dir = "migrations/finance"
+
+[[d1_databases]]
+binding = "DB_TIMETABLE"
+database_name = "sms-d1-timetable"
+database_id = "00000000-0000-0000-0000-000000000007"
+migrations_dir = "migrations/timetable"
+
+[[d1_databases]]
+binding = "DB_AUDIT"
+database_name = "sms-d1-audit"
+database_id = "00000000-0000-0000-0000-000000000008"
+migrations_dir = "migrations/audit"
 
 # ==========================================
 # CLOUDFLARE R2 OBJECT STORAGE
@@ -115,32 +157,32 @@ WHATSAPP_API_KEY=mock_whatsapp_key
 
 ---
 
-## 3. Native D1 Migrations & Wrangler Workflow (`migrations/*.sql`)
+## 3. Native 8-D1 Migrations & Wrangler Workflow (`migrations/<domain>/*.sql`)
 
-This project uses **no ORM or external schema-generation tool**. Database schema changes are authored directly as reviewed SQLite DDL files in `migrations/` (matching `migrations_dir = "migrations"` in `wrangler.toml`) and managed with Wrangler's built-in migration tracker (`d1_migrations`):
+This project uses **no ORM or external schema-generation tool**. Database schema changes are authored directly as reviewed SQLite DDL files in `migrations/<domain>/` (matching each `migrations_dir` in `wrangler.toml`) and managed with Wrangler's built-in migration tracker (`d1_migrations`):
 
 ```bash
-# 1. Create a new numbered SQL migration file in migrations/
-npm run db:migration:create -- add_feature_table
-# Or directly: npx wrangler d1 migrations create sms-coaching-d1 add_feature_table
+# 1. Create a new numbered SQL migration file in a domain track
+npx wrangler d1 migrations create sms-d1-finance add_feature_table
 
-# 2. Apply pending migrations to local D1 (.wrangler/state/v3/d1)
+# 2. Apply pending migrations across all 8 local D1s (.wrangler/state/v3/d1)
 npm run db:migrate:local
-# Or: npx wrangler d1 migrations apply sms-coaching-d1 --local
 
-# 3. Apply pending migrations to remote production D1
-npm run db:migrate:prod
-# Or: npx wrangler d1 migrations apply sms-coaching-d1 --remote
+# 3. Apply pending migrations to remote production D1s (requires explicit safety guard)
+CONFIRM_REMOTE_D1_MIGRATE=true npm run db:migrate:prod
 
-# 4. Inspect applied vs pending migrations
-npx wrangler d1 migrations list sms-coaching-d1 --local
-npx wrangler d1 migrations list sms-coaching-d1 --remote
+# 4. Seed and verify all 8 local D1s
+npm run db:seed:local
+npm run db:verify:local
+
+# 5. Reset local D1 state only (never remote)
+npm run db:reset:local
 ```
 
 **Migration & Seed Rules:**
-1. Include `PRAGMA foreign_keys = ON;` and explicit `REFERENCES ... ON DELETE RESTRICT/CASCADE`, `UNIQUE`, and `CHECK` constraints directly in `migrations/*.sql`. Never put `BEGIN`/`COMMIT` inside migration or seed files.
-2. Keep applied migrations immutable; fix mistakes with follow-up numbered migrations (`0002_*.sql`).
-3. Keep synthetic development fixtures in `seeds/seed.sql` outside `migrations/` and apply locally via `npm run db:seed:local` (`npx wrangler d1 execute sms-coaching-d1 --local --file=./seeds/seed.sql`) so `npm run db:migrate:prod` never runs seed data in production.
+1. Include `PRAGMA foreign_keys = ON;` and explicit intra-DB `REFERENCES ... ON DELETE RESTRICT/CASCADE`, `UNIQUE`, and `CHECK` constraints directly in `migrations/<domain>/*.sql`. Never create cross-D1 foreign keys, and never put `BEGIN`/`COMMIT` inside migration or seed files.
+2. Keep applied migrations immutable; fix mistakes with follow-up numbered migrations (`0002_*.sql`). Legacy single-D1 files are archived in `docs/archive/single-d1/`.
+3. Keep synthetic development fixtures in `seeds/01_identity.sql`..`seeds/08_audit.sql` outside `migrations/` and apply locally via `npm run db:seed:local` so `npm run db:migrate:prod` never runs seed data in production.
 
 ---
 

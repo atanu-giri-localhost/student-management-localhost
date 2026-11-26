@@ -1,5 +1,6 @@
 import { hashSessionToken } from '@/lib/auth/crypto';
-import { getDb, resolveWorkerEnv } from '@/lib/cloudflare/bindings';
+import { hydrateUserProfiles } from '@/lib/auth/profile-hydration';
+import { D1_BINDINGS, getDomainDb, resolveWorkerEnv } from '@/lib/cloudflare/bindings';
 import { nowIso } from '@/lib/dates/format';
 import { jsonError } from '@/lib/http/response';
 import { readConfigString } from '@/lib/whatsapp/provider';
@@ -116,8 +117,9 @@ export function buildClearSessionCookieHeader(options = {}) {
 }
 
 /**
- * Hydrate the authenticated session context from request cookies + D1 `sessions`.
- * Returns `{ ok: true, session, db, workerEnv }` or `{ ok: false, response }`.
+ * Hydrate the authenticated session context from request cookies + `DB_IDENTITY` `sessions`,
+ * followed by role-scoped profile hydration from `DB_STUDENTS` / `DB_ACADEMICS`.
+ * Returns `{ ok: true, session, identityDb, workerEnv }` or `{ ok: false, response }`.
  *
  * @param {Request} request
  * @param {{ requestId?: string, explicitEnv?: Record<string, unknown> }} [options]
@@ -127,7 +129,7 @@ export async function requireAuth(request, options = {}) {
 
   try {
     const workerEnv = await resolveWorkerEnv(explicitEnv);
-    const db = getDb(workerEnv);
+    const identityDb = getDomainDb(workerEnv, D1_BINDINGS.IDENTITY);
     const cookieName = getSessionCookieName(workerEnv);
     const rawToken = readCookieFromRequest(request, cookieName);
 
@@ -142,9 +144,9 @@ export async function requireAuth(request, options = {}) {
     }
 
     const tokenHash = await hashSessionToken(rawToken);
-    const session = await findActiveSessionByTokenHash(db, tokenHash, nowIso());
+    const identitySession = await findActiveSessionByTokenHash(identityDb, tokenHash, nowIso());
 
-    if (!session) {
+    if (!identitySession) {
       return {
         ok: false,
         response: jsonError('UNAUTHENTICATED', 'Session is missing, expired, or revoked.', {
@@ -154,10 +156,18 @@ export async function requireAuth(request, options = {}) {
       };
     }
 
+    const profiles = await hydrateUserProfiles(workerEnv, {
+      userId: identitySession.userId,
+      roles: identitySession.roles,
+    });
+
     return {
       ok: true,
-      session,
-      db,
+      session: {
+        ...identitySession,
+        profiles,
+      },
+      identityDb,
       workerEnv,
     };
   } catch {

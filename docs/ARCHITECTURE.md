@@ -3,7 +3,7 @@
 **Project:** Student Management System (Coaching Institute + Mess Fee Management)  
 **Document Version:** 2.0 (Phase 0 Aligned)  
 **PRD Reference:** PRD v1.2 & Phase 0 Architecture Pack  
-**Approved Stack:** Next.js App Router (JavaScript) · Cloudflare Workers · Cloudflare D1 (SQLite, Direct `env.DB` Bindings — No ORM) · Cloudflare R2 · Tailwind CSS + shadcn/ui · WhatsApp OTP  
+**Approved Stack:** Next.js App Router (JavaScript) · Cloudflare Workers · 8× Cloudflare D1 (SQLite, Direct `env.DB_<DOMAIN>` Bindings — No ORM) · Cloudflare R2 · Tailwind CSS + shadcn/ui · WhatsApp OTP  
 
 ---
 
@@ -11,10 +11,10 @@
 
 The application is structured as a **Modular Monolith** delivered within a single full-stack Next.js application deployed to **Cloudflare Workers**. 
 
-* **Single Institution Scope (ADR-001):** Built for one coaching institute with mess fees as an integrated fee component. No multi-tenant complexity or separate database per module.
+* **Single Institution Scope (ADR-001):** Built for one coaching institute with mess fees as an integrated fee component. No multi-tenant complexity.
 * **Unified Full-Stack Runtime (ADR-002):** UI and backend services reside in the same Next.js repository. No separate Express, NestJS, or external API gateways.
 * **Edge-Native Deployment (ADR-004):** Hosted on Cloudflare Workers using the recommended adapter (**vinext** baseline, with **OpenNext** as evaluated fallback).
-* **Serverless Storage & Data (ADR-005, ADR-007):** Cloudflare D1 (serverless SQLite) for relational state; Cloudflare R2 for binary assets (photos, documents).
+* **Serverless Storage & Data (ADR-005, ADR-007):** 8 domain-isolated Cloudflare D1 (SQLite) databases (`DB_IDENTITY`, `DB_STUDENTS`, `DB_ACADEMICS`, `DB_ATTENDANCE`, `DB_PERFORMANCE`, `DB_FINANCE`, `DB_TIMETABLE`, `DB_AUDIT`) for relational state (see [PHASE_A_DATABASE_ARCHITECTURE_PROPOSAL.md](./PHASE_A_DATABASE_ARCHITECTURE_PROPOSAL.md)); Cloudflare R2 for binary assets (photos, documents). Cross-D1 references are soft UUIDs validated in service layers (no cross-D1 foreign keys). Critical-event mutations in `DB_IDENTITY`, `DB_STUDENTS`, `DB_ATTENDANCE`, and `DB_FINANCE` write to domain-local `audit_outbox` atomically inside `batch()` for idempotent Phase B reconciliation into `DB_AUDIT.audit_logs`.
 * **JavaScript First (ADR-003):** All application code is standard `.js` and `.jsx` with JSDoc typing and Zod runtime schema validation.
 
 ```mermaid
