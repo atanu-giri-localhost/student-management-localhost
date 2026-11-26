@@ -1,46 +1,21 @@
 'use client';
 
 import { ErrorBanner } from '@/components/data-display/error-banner';
+import { EmptyState } from '@/components/data-display/empty-state';
 import { LoadingSkeleton } from '@/components/data-display/loading-skeleton';
 import { SectionHeader } from '@/components/layout/SectionHeader';
 import { StatCard } from '@/components/data-display/stat-card';
 import { PortalShell } from '@/components/layout/portal-shell';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { WeeklyMatrix } from '@/components/timetable/weekly-matrix';
 import { useSession } from '@/lib/auth/use-session';
-
-const STATS = [
-  { label: 'Classes Scheduled', value: '18', subtitle: 'This week' },
-  { label: 'Periods / Day', value: '8', subtitle: 'Mon–Sat' },
-  { label: 'Free Slots', value: '12', subtitle: 'Open periods' },
-  { label: 'Conflicts', value: '0', subtitle: 'No overlaps' },
-];
-
-const SCHEDULE = {
-  'Mon-1': { subject: 'Mathematics', room: 'R-301' },
-  'Mon-2': { subject: 'Science', room: 'R-201' },
-  'Mon-3': { subject: 'English', room: 'R-101' },
-  'Mon-4': { subject: 'Social Studies', room: 'R-202' },
-  'Tue-1': { subject: 'Science', room: 'R-201' },
-  'Tue-2': { subject: 'Mathematics', room: 'R-301' },
-  'Tue-3': { subject: 'Hindi', room: 'R-102' },
-  'Wed-1': { subject: 'English', room: 'R-101' },
-  'Wed-2': { subject: 'Social Studies', room: 'R-202' },
-  'Wed-3': { subject: 'Mathematics', room: 'R-301' },
-  'Thu-1': { subject: 'Mathematics', room: 'R-301' },
-  'Thu-2': { subject: 'Science', room: 'R-201' },
-  'Thu-3': { subject: 'Computer', room: 'R-303' },
-  'Fri-1': { subject: 'Social Studies', room: 'R-202' },
-  'Fri-2': { subject: 'English', room: 'R-101' },
-  'Fri-3': { subject: 'Hindi', room: 'R-102' },
-  'Sat-1': { subject: 'Science', room: 'R-201' },
-  'Sat-2': { subject: 'Computer', room: 'R-303' },
-};
+import { useApiList } from '@/lib/auth/use-api-list';
 
 export default function AdminTimetablePage() {
-  const { sessionData, loading, errorMsg, handleRetry, handleLogout } = useSession();
+  const { sessionData, loading: sessionLoading, errorMsg: sessionError, handleRetry, handleLogout } = useSession();
+  const { data: calendar, total, loading, errorMsg, reload } = useApiList('/api/v1/timetable/calendar?pageSize=50');
 
-  if (loading) {
+  if (sessionLoading) {
     return (
       <main className="mx-auto max-w-5xl px-4 sm:px-6 py-6">
         <LoadingSkeleton rows={4} />
@@ -48,14 +23,10 @@ export default function AdminTimetablePage() {
     );
   }
 
-  if (errorMsg || !sessionData) {
+  if (sessionError || !sessionData) {
     return (
       <main className="mx-auto max-w-5xl px-4 sm:px-6 py-6">
-        <ErrorBanner
-          title="Session check failed"
-          message={errorMsg || 'Please sign in again.'}
-          onRetry={handleRetry}
-        />
+        <ErrorBanner title="Session check failed" message={sessionError || 'Please sign in again.'} onRetry={handleRetry} />
       </main>
     );
   }
@@ -73,24 +44,51 @@ export default function AdminTimetablePage() {
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        <SectionHeader
-          title="Timetable"
-          description="Weekly schedule across classes, rooms, and subjects."
-        />
+        <SectionHeader title="Timetable" description="Academic calendar, rooms, and schedule configuration." />
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {STATS.map((stat) => (
-            <StatCard key={stat.label} title={stat.label} value={stat.value} subtitle={stat.subtitle} />
-          ))}
+          <StatCard title="Calendar Entries" value={loading ? '—' : total} subtitle="Academic calendar" />
+          <StatCard title="Loaded" value={loading ? '—' : calendar.length} subtitle="On this page" />
+          <StatCard title="Source" value="D1" subtitle="DB_TIMETABLE" />
+          <StatCard title="Mode" value="Live" subtitle="Request-scoped" />
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Weekly Matrix</CardTitle>
-            <CardDescription>Master timetable — Mon to Sat, periods 1–8.</CardDescription>
+            <CardTitle>Academic Calendar</CardTitle>
+            <CardDescription>Calendar entries (holidays, events, exam days).</CardDescription>
           </CardHeader>
-          <CardContent>
-            <WeeklyMatrix schedule={SCHEDULE} />
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="p-4"><LoadingSkeleton rows={4} /></div>
+            ) : errorMsg ? (
+              <div className="p-4"><ErrorBanner title="Could not load calendar" message={errorMsg} onRetry={reload} /></div>
+            ) : calendar.length === 0 ? (
+              <div className="p-4"><EmptyState title="No calendar entries" description="Academic calendar entries will appear here once added." /></div>
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-full border-collapse text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Day Type</th>
+                      <th className="px-4 py-3">Title</th>
+                      <th className="px-4 py-3">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                    {calendar.map((c) => (
+                      <tr key={c.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">{c.calendarDate}</td>
+                        <td className="px-4 py-3"><Badge variant={c.dayType === 'HOLIDAY' ? 'warning' : 'info'}>{c.dayType}</Badge></td>
+                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{c.title || '—'}</td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{c.notes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
