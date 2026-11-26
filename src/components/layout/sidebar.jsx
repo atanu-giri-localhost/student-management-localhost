@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { LogoutIcon } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 /**
@@ -13,15 +14,17 @@ import { cn } from '@/lib/utils';
  *   instituteName?: string,
  *   openMobile?: boolean,
  *   onCloseMobile?: () => void,
+ *   onLogout?: () => void,
  * }} props
  */
 export function Sidebar({
   items,
   activePath = '',
   roleLabel = 'Portal',
-  instituteName = 'Apex Coaching Institute',
+  instituteName = 'Shri Ramkrishna Bhaban',
   openMobile = false,
   onCloseMobile,
+  onLogout,
 }) {
   const navContent = (
     <div className="flex h-full flex-col justify-between bg-white px-3 py-4 dark:bg-slate-900">
@@ -55,8 +58,18 @@ export function Sidebar({
         </nav>
       </div>
 
-      <div className="border-t border-slate-100 pt-4 text-xs text-slate-400">
-        <span>SMS Phase 1 Shell</span>
+      <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
+        {onLogout ? (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-1 dark:text-slate-400 dark:hover:bg-rose-950/40 dark:hover:text-rose-300"
+          >
+            <LogoutIcon className="h-4 w-4" />
+            Sign out
+          </button>
+        ) : null}
+        <p className="mt-2 px-3 text-xs text-slate-400 dark:text-slate-500">SMS Phase 1 Shell</p>
       </div>
     </div>
   );
