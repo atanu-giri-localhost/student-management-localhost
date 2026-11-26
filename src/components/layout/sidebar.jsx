@@ -19,7 +19,7 @@ export function Sidebar({
   items,
   activePath = '',
   roleLabel = 'Portal',
-  instituteName = 'Apex Coaching Institute',
+  instituteName = 'Shri Ramkrishna Bhaban',
   openMobile = false,
   onCloseMobile,
 }) {

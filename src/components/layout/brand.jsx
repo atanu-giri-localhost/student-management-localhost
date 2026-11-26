@@ -24,8 +24,8 @@ export function Brand({ href = '/', compact = false, className }) {
         <InstitutionIcon className="h-5 w-5" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-sm font-semibold leading-tight text-slate-900 dark:text-slate-100">
-          Apex Coaching Institute
+        <span className="block truncate text-xs font-semibold leading-tight text-slate-900 sm:text-sm dark:text-slate-100">
+          Shri Ramkrishna Bhaban
         </span>
         {compact ? null : (
           <span className="mt-0.5 hidden truncate text-xs font-medium text-slate-500 sm:block dark:text-slate-400">
