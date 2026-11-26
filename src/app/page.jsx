@@ -17,7 +17,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="flex flex-1 items-center lg:overflow-y-auto">
+      <main className="flex flex-1 items-start lg:items-center lg:overflow-y-auto">
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-16">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.1em] text-blue-600 sm:text-sm sm:tracking-[0.16em]">
