@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Apex Coaching Institute — Student Management System',
+  title: 'Shri Ramkrishna Bhaban — Student Management System',
   description:
     'Unified Student Management System for coaching academics, dual attendance, and integer-paise fee & mess ledger.',
 };
