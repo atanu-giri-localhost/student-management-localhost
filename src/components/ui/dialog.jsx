@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { CloseIcon } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 /**
@@ -39,16 +40,16 @@ export function Dialog({ open, onClose, title, description, className, children 
         type="button"
         aria-label="Close modal overlay"
         onClick={() => onClose?.()}
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-[1px]"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-[1px] dark:bg-slate-950/70"
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cn(
-          'relative z-10 w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl',
-          className
-        )}
+          className={cn(
+            'relative z-10 w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900',
+            className
+          )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
@@ -62,7 +63,7 @@ export function Dialog({ open, onClose, title, description, className, children 
               aria-label="Close dialog"
               className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
             >
-              <span aria-hidden="true">✕</span>
+              <CloseIcon className="h-4 w-4" />
             </button>
           ) : null}
         </div>

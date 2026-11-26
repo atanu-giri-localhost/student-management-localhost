@@ -1,7 +1,7 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 /**
  * Top bar header for authenticated role portals.
@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
  *   title: string,
  *   userLabel?: string,
  *   roleLabel?: string,
- *   sessionLabel?: string,
  *   onOpenMobileMenu?: () => void,
  *   onLogout?: () => void,
  *   rightSlot?: import('react').ReactNode,
@@ -20,13 +19,12 @@ export function Topbar({
   title,
   userLabel,
   roleLabel,
-  sessionLabel = '2026-2027',
   onOpenMobileMenu,
   onLogout,
   rightSlot,
 }) {
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 sm:px-6">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center gap-3">
         {onOpenMobileMenu ? (
           <Button
@@ -39,16 +37,16 @@ export function Topbar({
             Menu
           </Button>
         ) : null}
-        <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-        {sessionLabel ? <Badge variant="primary">Session {sessionLabel}</Badge> : null}
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         {rightSlot}
+        <ThemeToggle />
         {userLabel ? (
           <div className="hidden text-right sm:block">
-            <p className="text-sm font-medium text-slate-900">{userLabel}</p>
-            {roleLabel ? <p className="text-xs text-slate-500">{roleLabel}</p> : null}
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{userLabel}</p>
+            {roleLabel ? <p className="text-xs text-slate-500 dark:text-slate-400">{roleLabel}</p> : null}
           </div>
         ) : null}
         {onLogout ? (
