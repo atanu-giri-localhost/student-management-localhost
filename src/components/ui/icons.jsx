@@ -150,6 +150,33 @@ export function SunIcon(props) {
   );
 }
 
+export function CloseIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </Icon>
+  );
+}
+
+export function TrendUpIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="m22 7-8.5 8.5-5-5L2 17" />
+      <path d="M16 7h6v6" />
+    </Icon>
+  );
+}
+
+export function TrendDownIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="m22 17-8.5-8.5-5 5L2 7" />
+      <path d="M16 17h6v-6" />
+    </Icon>
+  );
+}
+
 const PORTAL_ICONS = {
   super_admin: ShieldIcon,
   admin: ShieldCheckIcon,

@@ -14,9 +14,9 @@ export const PORTALS = [
     icon: 'admin',
     href: '/login?portal=super_admin',
     accent: {
-      icon: 'bg-purple-50 text-purple-600',
-      tabActive: 'border-purple-300 bg-purple-50 text-purple-700',
-      darkIcon: 'bg-purple-400/10 text-purple-300 ring-purple-400/30',
+      icon: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
+      tabActive: 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300',
+      darkIcon: 'bg-blue-400/10 text-blue-300',
     },
   },
   {
@@ -28,9 +28,9 @@ export const PORTALS = [
     icon: 'admin',
     href: '/login?portal=admin',
     accent: {
-      icon: 'bg-indigo-50 text-indigo-600',
-      tabActive: 'border-indigo-300 bg-indigo-50 text-indigo-700',
-      darkIcon: 'bg-indigo-400/10 text-indigo-300 ring-indigo-400/30',
+      icon: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
+      tabActive: 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300',
+      darkIcon: 'bg-blue-400/10 text-blue-300',
     },
   },
   {
@@ -42,9 +42,9 @@ export const PORTALS = [
     icon: 'teacher',
     href: '/login?portal=teacher',
     accent: {
-      icon: 'bg-sky-50 text-sky-600',
-      tabActive: 'border-sky-300 bg-sky-50 text-sky-700',
-      darkIcon: 'bg-sky-400/10 text-sky-300 ring-sky-400/30',
+      icon: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
+      tabActive: 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300',
+      darkIcon: 'bg-blue-400/10 text-blue-300',
     },
   },
   {
@@ -56,9 +56,9 @@ export const PORTALS = [
     icon: 'parent',
     href: '/login?portal=parent',
     accent: {
-      icon: 'bg-amber-50 text-amber-600',
-      tabActive: 'border-amber-300 bg-amber-50 text-amber-700',
-      darkIcon: 'bg-amber-400/10 text-amber-300 ring-amber-400/30',
+      icon: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
+      tabActive: 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300',
+      darkIcon: 'bg-blue-400/10 text-blue-300',
     },
   },
   {
@@ -70,14 +70,14 @@ export const PORTALS = [
     icon: 'student',
     href: '/login?portal=student',
     accent: {
-      icon: 'bg-emerald-50 text-emerald-600',
-      tabActive: 'border-emerald-300 bg-emerald-50 text-emerald-700',
-      darkIcon: 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/30',
+      icon: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
+      tabActive: 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300',
+      darkIcon: 'bg-blue-400/10 text-blue-300',
     },
   },
 ];
 
-const PORTALS_BY_KEY = Object.fromEntries(PORTALS.map((portal) => [portal.key, portal]));
+const PORTALS_BY_KEY = Object.fromEntries(PORTALS.map((portal) => [portal.key]));
 
 /**
  * Look up a portal by its URL key.

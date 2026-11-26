@@ -18,7 +18,6 @@ import { Topbar } from '@/components/layout/topbar';
  *   pageTitle: string,
  *   activePath?: string,
  *   userLabel?: string,
- *   sessionLabel?: string,
  *   onLogout?: () => void,
  *   topbarRightSlot?: import('react').ReactNode,
  *   children: import('react').ReactNode,
@@ -30,7 +29,6 @@ export function PortalShell({
   pageTitle,
   activePath,
   userLabel,
-  sessionLabel,
   onLogout,
   topbarRightSlot,
   children,
@@ -48,19 +46,18 @@ export function PortalShell({
         onCloseMobile={() => setMobileMenuOpen(false)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col lg:ml-64 lg:w-[calc(100%-256px)] overflow-x-hidden">
-        <div className="sticky top-0 z-30 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700">
+      <div className="flex min-w-0 flex-1 flex-col lg:ml-64 lg:w-[calc(100%-256px)]">
+        <header className="sticky top-0 z-30 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700">
           <Topbar
             title={pageTitle}
             userLabel={userLabel}
             roleLabel={roleLabel ?? roleName}
-            sessionLabel={sessionLabel}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={onLogout}
             rightSlot={topbarRightSlot}
           />
-        </div>
-        <main className="flex-1 min-h-0 overflow-y-auto">
+        </header>
+        <main className="flex-1">
           <PageContainer size="standard" padding="default">{children}</PageContainer>
         </main>
       </div>

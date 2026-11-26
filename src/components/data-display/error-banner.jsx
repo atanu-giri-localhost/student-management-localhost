@@ -29,7 +29,7 @@ export function ErrorBanner({
     >
       <div>
         <p className="font-semibold">{title}</p>
-        <p className="mt-0.5 text-rose-800 dark:text-rose-300">{message}</p>
+        <p className="mt-1 text-rose-800 dark:text-rose-300">{message}</p>
         {requestId ? (
           <p className="mt-1 font-mono text-xs text-rose-700 dark:text-rose-400">Reference ID: {requestId}</p>
         ) : null}

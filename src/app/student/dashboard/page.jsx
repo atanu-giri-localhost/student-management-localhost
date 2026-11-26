@@ -1,109 +1,38 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { ErrorBanner } from '@/components/data-display/error-banner';
 import { LoadingSkeleton } from '@/components/data-display/loading-skeleton';
 import { SectionHeader } from '@/components/layout/SectionHeader';
 import { StatCard } from '@/components/data-display/stat-card';
 import { PortalShell } from '@/components/layout/portal-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSession } from '@/lib/auth/use-session';
+import { cn } from '@/lib/utils';
 
-async function fetchSessionRequest(signal) {
-  const response = await fetch('/api/v1/auth/session', { cache: 'no-store', signal });
-  const payload = await response.json().catch(() => ({}));
-  return { status: response.status, ok: response.ok, payload };
-}
+const SUBJECT_SCORES = [
+  { subject: 'Mathematics', score: 92, color: 'bg-blue-500 dark:bg-blue-700' },
+  { subject: 'Physics', score: 88, color: 'bg-blue-500 dark:bg-blue-700' },
+  { subject: 'Chemistry', score: 85, color: 'bg-blue-500 dark:bg-blue-700' },
+  { subject: 'Biology', score: 95, color: 'bg-blue-500 dark:bg-blue-700' },
+  { subject: 'English', score: 78, color: 'bg-blue-500 dark:bg-blue-700' },
+];
 
-const STUDENT_QUICK_LINKS = [
-  { label: 'Profile', href: '/student/profile', icon: 'user' },
-  { label: 'Attendance', href: '/student/attendance', icon: 'calendar' },
-  { label: 'Performance', href: '/student/performance', icon: 'bar-chart' },
-  { label: 'Exam Results', href: '/student/results', icon: 'file-text' },
-  { label: 'Timetable', href: '/student/timetable', icon: 'clock' },
+const ATTENDANCE_DATA = [
+  { label: 'Present', count: 42, color: 'bg-emerald-500 dark:bg-emerald-700', pct: 84 },
+  { label: 'Absent', count: 5, color: 'bg-rose-500 dark:bg-rose-700', pct: 10 },
+  { label: 'Late', count: 3, color: 'bg-amber-500 dark:bg-amber-700', pct: 6 },
+];
+
+const SCORE_TREND = [
+  { exam: 'Unit 1', score: 72 },
+  { exam: 'Unit 2', score: 78 },
+  { exam: 'Mid-Term', score: 85 },
+  { exam: 'Unit 3', score: 88 },
+  { exam: 'Final', score: 92 },
 ];
 
 export default function StudentDashboardPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  // TEMPORARY DEV BYPASS — remove before production.
-  // Access: /student/dashboard?dev-bypass=1
-  const devBypass = searchParams.get('dev-bypass') === '1';
-
-  const [sessionData, setSessionData] = useState(() =>
-    devBypass
-      ? {
-          user: { phoneNormalized: '+919999900000' },
-          roles: ['STUDENT'],
-          profiles: { studentId: 'STU-0001', teacherProfileId: null, parentProfileId: null },
-          session: { expiresAt: '2026-12-25T00:00:00Z' },
-        }
-      : null,
-  );
-  const [loading, setLoading] = useState(!devBypass);
-  const [errorMsg, setErrorMsg] = useState('');
-
-  useEffect(() => {
-    if (devBypass) {
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    fetchSessionRequest(controller.signal)
-      .then(({ status, ok, payload }) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        if (status === 401) {
-          router.replace('/login');
-          return;
-        }
-        if (!ok) {
-          setErrorMsg(payload?.error?.message || 'Unable to load active session.');
-          return;
-        }
-        setSessionData(payload.data);
-      })
-      .catch((err) => {
-        if (err?.name !== 'AbortError' && !controller.signal.aborted) {
-          setErrorMsg('Network error while checking active session.');
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      });
-
-    return () => controller.abort();
-  }, [devBypass, router]);
-
-  async function handleRetry() {
-    setLoading(true);
-    setErrorMsg('');
-    try {
-      const { status, ok, payload } = await fetchSessionRequest();
-      if (status === 401) {
-        router.replace('/login');
-        return;
-      }
-      if (!ok) {
-        setErrorMsg(payload?.error?.message || 'Unable to load active session.');
-        return;
-      }
-      setSessionData(payload.data);
-    } catch {
-      setErrorMsg('Network error while checking active session.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleLogout() {
-    await fetch('/api/v1/auth/logout', { method: 'POST' }).catch(() => null);
-    router.replace('/login');
-  }
+  const { sessionData, loading, errorMsg, handleRetry, handleLogout } = useSession();
 
   if (loading) {
     return (
@@ -126,107 +55,122 @@ export default function StudentDashboardPage() {
   }
 
   const primaryRole = sessionData.roles?.[0] || 'STUDENT';
+  const totalAttendance = ATTENDANCE_DATA.reduce((s, d) => s + d.count, 0);
 
   return (
     <PortalShell
       roleName={primaryRole}
       roleLabel="Student"
-      pageTitle={devBypass ? 'Student Dashboard (Dev Bypass)' : 'Student Dashboard'}
+      pageTitle="Student Dashboard"
       activePath="/student/dashboard"
       userLabel={sessionData.user.phoneNormalized}
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        {devBypass ? (
-          <div className="rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4">
-            <p className="font-semibold text-rose-800 dark:text-rose-400 text-sm">Dev bypass active</p>
-            <p className="mt-0.5 text-xs text-rose-700 dark:text-rose-300">
-              Authentication is skipped. Local development only — remove before production.
-            </p>
-          </div>
-        ) : null}
         <SectionHeader
           title="Student Dashboard"
-          description={devBypass ? 'Temporary local access without OTP.' : 'View your attendance, performance, exam results, and timetable.'}
+          description="View your attendance, performance, exam results, and timetable."
         />
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <StatCard
-            title="Authenticated Phone"
-            value={sessionData.user.phoneNormalized}
-            badgeText={devBypass ? 'Dev Bypass' : 'Verified OTP'}
-            badgeVariant={devBypass ? 'warning' : 'success'}
-          />
-          <StatCard
-            title="Primary Role"
-            value={primaryRole.replace(/_/g, ' ')}
-            badgeText="Student Access"
-            badgeVariant="primary"
-          />
-          <StatCard
-            title="Session Status"
-            value="Active"
-            badgeText={devBypass ? 'Dev Bypass' : 'HttpOnly Cookie'}
-            badgeVariant={devBypass ? 'info' : 'info'}
-          />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Subject Performance</CardTitle>
+              <CardDescription>
+                Scores across all subjects (out of 100).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {SUBJECT_SCORES.map((item) => (
+                <div key={item.subject} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{item.subject}</span>
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{item.score}</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className={cn('h-full rounded-full transition-all', item.color)}
+                      style={{ width: `${item.score}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Attendance Donut Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Attendance Overview</CardTitle>
+              <CardDescription>
+                {totalAttendance} total days recorded.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
+              <div className="relative h-32 w-32 shrink-0">
+                <div
+                  className="h-32 w-32 rounded-full"
+                  style={{
+                    background: `conic-gradient(#059669 0% ${ATTENDANCE_DATA[0].pct}%, #e11d48 ${ATTENDANCE_DATA[0].pct}% ${ATTENDANCE_DATA[0].pct + ATTENDANCE_DATA[1].pct}%, #d97706 ${ATTENDANCE_DATA[0].pct + ATTENDANCE_DATA[1].pct}% 100%)`,
+                  }}
+                />
+                <div className="absolute inset-3 flex flex-col items-center justify-center rounded-full bg-white dark:bg-slate-900">
+                  <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    {Math.round((ATTENDANCE_DATA[0].count / totalAttendance) * 100)}%
+                  </span>
+                  <span className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Present
+                  </span>
+                </div>
+              </div>
+              <div className="w-full space-y-2 sm:w-auto">
+                {ATTENDANCE_DATA.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between gap-4 text-xs sm:gap-8">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('h-2 w-2 rounded-full', item.color)} />
+                      <span className="text-slate-600 dark:text-slate-400">{item.label}</span>
+                    </div>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">{item.count}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
+        {/* Score Trend Line Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Quick Links</CardTitle>
+            <CardTitle>Score Trend</CardTitle>
             <CardDescription>
-              Select a section to continue.
+              Performance progression across exams.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3">
-            {STUDENT_QUICK_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="flex flex-col items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 text-center transition hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2"
-              >
-                <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold">
-                  {link.label}
-                </span>
-              </a>
-            ))}
+          <CardContent>
+            <div className="flex h-40 items-end justify-between gap-2 sm:gap-4">
+              {SCORE_TREND.map((point) => (
+                <div key={point.exam} className="flex flex-1 flex-col items-center gap-2">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{point.score}</span>
+                  <div
+                    className="w-full max-w-12 rounded-t-lg bg-blue-500 dark:bg-blue-700 transition-all"
+                    style={{ height: `${point.score * 1.2}px` }}
+                  />
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400 text-center leading-tight">
+                    {point.exam}
+                  </span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Linked Profiles</CardTitle>
-            <CardDescription>
-              Your institute-linked profile identifiers.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-2 sm:grid-cols-3 text-sm">
-            <div className="flex flex-col gap-1">
-              <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold">
-                Student ID
-              </span>
-              <span className="text-slate-900 dark:text-slate-100 font-medium">
-                {sessionData.profiles?.studentId ?? 'none'}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold">
-                Teacher ID
-              </span>
-              <span className="text-slate-900 dark:text-slate-100 font-medium">
-                {sessionData.profiles?.teacherProfileId ?? 'none'}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold">
-                Parent ID
-              </span>
-              <span className="text-slate-900 dark:text-slate-100 font-medium">
-                {sessionData.profiles?.parentProfileId ?? 'none'}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Quick Stats Row */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Subjects" value="5" subtitle="Enrolled this session" />
+          <StatCard title="Attendance" value="84%" subtitle="42 of 50 days present" />
+          <StatCard title="Avg Score" value="87.6" subtitle="Across 5 subjects" />
+          <StatCard title="Exams Taken" value="5" subtitle="This academic year" />
+        </div>
       </div>
     </PortalShell>
   );

@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 
@@ -11,7 +10,6 @@ import { ThemeToggle } from '@/components/layout/theme-toggle';
  *   title: string,
  *   userLabel?: string,
  *   roleLabel?: string,
- *   sessionLabel?: string,
  *   onOpenMobileMenu?: () => void,
  *   onLogout?: () => void,
  *   rightSlot?: import('react').ReactNode,
@@ -21,13 +19,12 @@ export function Topbar({
   title,
   userLabel,
   roleLabel,
-  sessionLabel = '2026-2027',
   onOpenMobileMenu,
   onLogout,
   rightSlot,
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:px-4 dark:border-slate-800 dark:bg-slate-900">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center gap-3">
         {onOpenMobileMenu ? (
           <Button
@@ -43,14 +40,9 @@ export function Topbar({
         <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         {rightSlot}
         <ThemeToggle />
-        {sessionLabel ? (
-          <Badge variant="primary" className="hidden sm:block">
-            Session {sessionLabel}
-          </Badge>
-        ) : null}
         {userLabel ? (
           <div className="hidden text-right sm:block">
             <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{userLabel}</p>
