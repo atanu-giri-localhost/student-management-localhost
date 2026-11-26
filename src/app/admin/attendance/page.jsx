@@ -1,6 +1,7 @@
 'use client';
 
 import { ErrorBanner } from '@/components/data-display/error-banner';
+import { EmptyState } from '@/components/data-display/empty-state';
 import { LoadingSkeleton } from '@/components/data-display/loading-skeleton';
 import { SectionHeader } from '@/components/layout/SectionHeader';
 import { StatCard } from '@/components/data-display/stat-card';
@@ -8,38 +9,14 @@ import { PortalShell } from '@/components/layout/portal-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useSession } from '@/lib/auth/use-session';
-
-const STATS = [
-  { label: 'Today Present', value: '94%', subtitle: 'Across all classes' },
-  { label: 'Absent', value: '6%', subtitle: 'Marked today' },
-  { label: 'Registers', value: '36', subtitle: 'Daily + period' },
-  { label: 'Pending Mark', value: '2', subtitle: 'Awaiting teacher' },
-];
-
-const DAILY = [
-  { date: '2026-11-26', className: 'X-A', present: 41, absent: 2, total: 43 },
-  { date: '2026-11-26', className: 'X-B', present: 40, absent: 2, total: 42 },
-  { date: '2026-11-26', className: 'IX-A', present: 42, absent: 2, total: 44 },
-  { date: '2026-11-26', className: 'IX-B', present: 39, absent: 2, total: 41 },
-  { date: '2026-11-26', className: 'VIII-A', present: 41, absent: 1, total: 42 },
-  { date: '2026-11-26', className: 'VIII-B', present: 38, absent: 2, total: 40 },
-];
-
-const PERIOD = [
-  { period: 'P1', subject: 'Mathematics', marked: '18/18', status: 'COMPLETE' },
-  { period: 'P2', subject: 'Science', marked: '18/18', status: 'COMPLETE' },
-  { period: 'P3', subject: 'English', marked: '16/18', status: 'PENDING' },
-  { period: 'P4', subject: 'Social Studies', marked: '17/18', status: 'PENDING' },
-];
-
-function periodVariant(status) {
-  return status === 'COMPLETE' ? 'success' : 'warning';
-}
+import { useApiList } from '@/lib/auth/use-api-list';
 
 export default function AdminAttendancePage() {
-  const { sessionData, loading, errorMsg, handleRetry, handleLogout } = useSession();
+  const { sessionData, loading: sessionLoading, errorMsg: sessionError, handleRetry, handleLogout } = useSession();
+  const summary = useApiList('/api/v1/attendance/summary?pageSize=50');
+  const registers = useApiList('/api/v1/attendance/daily/registers?pageSize=50');
 
-  if (loading) {
+  if (sessionLoading) {
     return (
       <main className="mx-auto max-w-5xl px-4 sm:px-6 py-6">
         <LoadingSkeleton rows={4} />
@@ -47,20 +24,20 @@ export default function AdminAttendancePage() {
     );
   }
 
-  if (errorMsg || !sessionData) {
+  if (sessionError || !sessionData) {
     return (
       <main className="mx-auto max-w-5xl px-4 sm:px-6 py-6">
-        <ErrorBanner
-          title="Session check failed"
-          message={errorMsg || 'Please sign in again.'}
-          onRetry={handleRetry}
-        />
+        <ErrorBanner title="Session check failed" message={sessionError || 'Please sign in again.'} onRetry={handleRetry} />
       </main>
     );
   }
 
   const primaryRole = sessionData.roles?.[0] || 'SUPER_ADMIN';
   const isSuperAdmin = primaryRole === 'SUPER_ADMIN';
+  const loading = summary.loading || registers.loading;
+  const avgPct = summary.data.length
+    ? Math.round(summary.data.reduce((s, r) => s + r.attendancePercentage, 0) / summary.data.length)
+    : 0;
 
   return (
     <PortalShell
@@ -72,78 +49,90 @@ export default function AdminAttendancePage() {
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        <SectionHeader
-          title="Attendance"
-          description="Monitor dual attendance registers: daily and period-wise."
-        />
+        <SectionHeader title="Attendance" description="Monitor dual attendance registers: daily and period-wise." />
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {STATS.map((stat) => (
-            <StatCard key={stat.label} title={stat.label} value={stat.value} subtitle={stat.subtitle} />
-          ))}
+          <StatCard title="Avg Attendance" value={loading ? '—' : `${avgPct}%`} subtitle="Across loaded records" />
+          <StatCard title="Daily Registers" value={loading ? '—' : registers.total} subtitle="Total" />
+          <StatCard title="Summaries" value={loading ? '—' : summary.total} subtitle="Enrollment rows" />
+          <StatCard title="Source" value="D1" subtitle="DB_ATTENDANCE" />
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Daily Register — Today</CardTitle>
-            <CardDescription>Present and absent counts per class for 2026-11-26.</CardDescription>
+            <CardTitle>Attendance Summary</CardTitle>
+            <CardDescription>Per-enrollment attendance breakdown.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-full border-collapse text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Class</th>
-                    <th className="px-4 py-3">Present</th>
-                    <th className="px-4 py-3">Absent</th>
-                    <th className="px-4 py-3">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {DAILY.map((d) => (
-                    <tr key={d.className} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">{d.date}</td>
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{d.className}</td>
-                      <td className="px-4 py-3 text-emerald-600 dark:text-emerald-400">{d.present}</td>
-                      <td className="px-4 py-3 text-rose-600 dark:text-rose-400">{d.absent}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{d.total}</td>
+            {summary.loading ? (
+              <div className="p-4"><LoadingSkeleton rows={4} /></div>
+            ) : summary.errorMsg ? (
+              <div className="p-4"><ErrorBanner title="Could not load summary" message={summary.errorMsg} onRetry={summary.reload} /></div>
+            ) : summary.data.length === 0 ? (
+              <div className="p-4"><EmptyState title="No attendance data" description="Attendance summaries appear once registers are marked." /></div>
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-full border-collapse text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3">Enrollment</th>
+                      <th className="px-4 py-3">Present</th>
+                      <th className="px-4 py-3">Absent</th>
+                      <th className="px-4 py-3">Late</th>
+                      <th className="px-4 py-3">Percentage</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                    {summary.data.map((r) => (
+                      <tr key={r.enrollmentId} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">{r.enrollmentId.slice(0, 8)}…</td>
+                        <td className="px-4 py-3 text-emerald-600 dark:text-emerald-400">{r.presentCount}</td>
+                        <td className="px-4 py-3 text-rose-600 dark:text-rose-400">{r.absentCount}</td>
+                        <td className="px-4 py-3 text-amber-600 dark:text-amber-400">{r.lateCount}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{r.attendancePercentage}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Period Registers</CardTitle>
-            <CardDescription>Period-wise attendance completion status.</CardDescription>
+            <CardTitle>Daily Registers</CardTitle>
+            <CardDescription>Daily attendance registers across classes.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-full border-collapse text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3">Period</th>
-                    <th className="px-4 py-3">Subject</th>
-                    <th className="px-4 py-3">Marked</th>
-                    <th className="px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {PERIOD.map((p) => (
-                    <tr key={p.period} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{p.period}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.subject}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.marked}</td>
-                      <td className="px-4 py-3"><Badge variant={periodVariant(p.status)}>{p.status}</Badge></td>
+            {registers.loading ? (
+              <div className="p-4"><LoadingSkeleton rows={3} /></div>
+            ) : registers.errorMsg ? (
+              <div className="p-4"><ErrorBanner title="Could not load registers" message={registers.errorMsg} onRetry={registers.reload} /></div>
+            ) : registers.data.length === 0 ? (
+              <div className="p-4"><EmptyState title="No daily registers" description="Daily registers appear once teachers mark attendance." /></div>
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-full border-collapse text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Class</th>
+                      <th className="px-4 py-3">Locked</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                    {registers.data.map((r) => (
+                      <tr key={r.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">{r.attendanceDate}</td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.classId?.slice(0, 8) ?? '—'}…</td>
+                        <td className="px-4 py-3"><Badge variant={r.isLocked ? 'default' : 'success'}>{r.isLocked ? 'LOCKED' : 'OPEN'}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
