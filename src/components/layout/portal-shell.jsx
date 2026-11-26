@@ -44,6 +44,7 @@ export function PortalShell({
         roleLabel={roleLabel ?? roleName}
         openMobile={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
+        onLogout={onLogout}
       />
 
       <div className="flex min-w-0 flex-1 flex-col lg:ml-64 lg:w-[calc(100%-256px)]">
